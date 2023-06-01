@@ -1,6 +1,10 @@
 # Directories
+__pycache__
+data/
 venv/
 
 
 # Files
 obis.ipynb
+overview.txt
+rel_data.md
