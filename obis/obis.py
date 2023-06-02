@@ -95,7 +95,7 @@ def output_json(response: requests.Response, endpoint_name: str, whale: str, par
 
 
 @obis_app.command('obis_request')
-def obis_request(whale: str='blue_whale', endpoint: str='occurrence', param: Optional[str]=None, start_date: Optional[str]=None, end_date: Optional[str]=None, output: bool=True) -> requests.Response:
+def obis_request(whale: str='blue_whale', endpoint: str='occurrence', param: Optional[str]=None, start_date: Optional[str]=None, end_date: Optional[str]=None, output: bool=True, size: Optional[int]=5000) -> requests.Response:
     """
     Send a get request to the obis api (https://api.obis.org/v3) to find information of encounters with a specified whale species.
 
@@ -113,7 +113,7 @@ def obis_request(whale: str='blue_whale', endpoint: str='occurrence', param: Opt
     Returns:
         `requests.Response`
     """
-    whale_list = {'blue_whale': {'scientific name': 'Balaenoptera musculus'}}
+    whale_list = {'blue_whale': {'scientific_name': 'Balaenoptera musculus'}, 'sperm_whale': {'scientific_name': 'Physeter macrocephalus'}}
     endpoints = ['occurrence', 'statistics']
     endpoint_params = {'occurrence': {'params': []}, 'statistics': {'params': ['years']}}
     assert whale in whale_list, f'Enter a whale from whale_list: {whale_list}'
@@ -122,14 +122,16 @@ def obis_request(whale: str='blue_whale', endpoint: str='occurrence', param: Opt
     
     api = 'https://api.obis.org/v3'
     try:
-        scientific_name = whale_list[whale]['scientific name']
+        scientific_name = whale_list[whale]['scientific_name']
         print(scientific_name)
         if param != None:
-            url = f'{api}/{endpoint}/{param}?scientificname={scientific_name}&startdate={start_date}&enddate={end_date}'
+            url = f'{api}/{endpoint}/{param}?scientificname={scientific_name}&startdate={start_date}&enddate={end_date}&size={size}'
             url = url.replace(' ', '%20')
             r = requests.get(url)
         else:
-            r = requests.get(f'{api}/{endpoint}?scientificname={scientific_name}&startdate={start_date}&enddate={end_date}')
+            url = f'{api}/{endpoint}?scientificname={scientific_name}&startdate={start_date}&enddate={end_date}&size={size}'
+            url = url.replace(' ', '%20')
+            r = requests.get(url)
         print(r.status_code)
         if output:
             output_json(response=r, endpoint_name=endpoint, whale=whale, param=param, start_date=start_date, end_date=end_date)
