@@ -25,27 +25,29 @@ def filter_keys(response: requests.Response) -> tuple:
     """
     # Relevant keys to keep
     key_list = [
-    'associatedMedia', 
-    'bibliographicCitation',  
-    'ownerInstitutionCode',
-    'recordedBy',
-    'rightsHolder',
+    'occurrenceID',
     'verbatimEventDate',
-    'coordinatePrecision', 
-    'coordinateUncertaintyInMeters',  
-    'bathymetry',
+    'eventDate',
+    'eventTime',
+    'year',
+    'month',
+    'day',
     'decimalLatitude',  
     'decimalLongitude',
+    'coordinatePrecision', 
+    'coordinateUncertaintyInMeters',  
     'locality',
-    'shoredistance',
+    'waterBody',
+    'bathymetry',
     'sst',
     'sss',
-    'waterBody',
-    'basisOfRecord',  
-    'occurrenceRemarks',  
+    'shoredistance',
     'taxonRemarks',
     'individualCount',  
-    'occurrenceID',
+    'vernacularName',
+    'specificEpithet',
+    'scientificName', 
+    'scientificNameID',
     'order',
     'orderid',  
     'family',
@@ -54,10 +56,13 @@ def filter_keys(response: requests.Response) -> tuple:
     'genusid',
     'species', 
     'speciesid',
-    'scientificName',  
-    'scientificNameID',  
-    'specificEpithet',
-    'vernacularName'
+    'rightsHolder',
+    'ownerInstitutionCode',
+    'recordedBy',
+    'associatedMedia', 
+    'basisOfRecord',  
+    'occurrenceRemarks',  
+    'bibliographicCitation'
     ]
     response = response.json()
     response_list = response['results']
@@ -119,7 +124,7 @@ def create_dataframe(response: requests.Response, endpoint_name: str, whale: str
     """
     filtered = filter_keys(response)
     response_list = filtered[0]
-    keys = filtered[1]
+    key_list = filtered[1]
     data_dir = './data'
     if param != None:
         output_dir = Path(f'{data_dir}/{endpoint_name}/{param}/{whale}')
@@ -128,6 +133,7 @@ def create_dataframe(response: requests.Response, endpoint_name: str, whale: str
 
     output_dir.mkdir(parents=True, exist_ok=True)
     df = pd.json_normalize(response_list)
+    df = df.reindex(columns=key_list)
     logger.info(f"Saving dataframe to csv: '{output_dir}/{start_date}--{end_date}.csv'")
     df.to_csv(f'{output_dir}/{start_date}--{end_date}.csv', index=False)
     return df
