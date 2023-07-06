@@ -1,3 +1,4 @@
+import datetime
 import json
 import logging
 from logging import INFO
@@ -102,6 +103,26 @@ def output_json(response: requests.Response, endpoint_name: str, whale: str, sta
         json.dump(response.json(), file, ensure_ascii=False, indent=4)
 
 
+def convert_dates(date_string: str) -> datetime.date:
+    """
+    convert eventDate column strings to datetime.date
+
+    Args:
+        date_string: str
+            a string in the format of a date
+    Returns:
+        `datetime.date`
+    """
+    # split string if it contains multiple datetimes
+    if '/' in date_string:
+        date_list = str.split(date_string, '/')
+        # only interested in the initial date sighted for now
+        date = pd.to_datetime(date_list[0]).date()
+    else:
+        date = pd.to_datetime(date_string).date()
+    return date
+
+
 def create_dataframe(response: requests.Response, endpoint_name: str, whale: str, start_date: str, end_date: str, param: Optional[str]=None):
     """
     Create a `pandas.DataFrame` from Obis API response
@@ -134,6 +155,7 @@ def create_dataframe(response: requests.Response, endpoint_name: str, whale: str
     output_dir.mkdir(parents=True, exist_ok=True)
     df = pd.json_normalize(response_list)
     df = df.reindex(columns=key_list)
+    df['eventDate'] = df['eventDate'].apply(convert_dates)
     logger.info(f"Saving dataframe to csv: '{output_dir}/{start_date}--{end_date}.csv'")
     df.to_csv(f'{output_dir}/{start_date}--{end_date}.csv', index=False)
     return df
