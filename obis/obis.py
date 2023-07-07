@@ -103,24 +103,29 @@ def output_json(response: requests.Response, endpoint_name: str, whale: str, sta
         json.dump(response.json(), file, ensure_ascii=False, indent=4)
 
 
-def convert_dates(date_string: str) -> datetime.date:
+def convert_dates(date_str: str) -> datetime.date:
     """
     convert eventDate column strings to datetime.date
 
     Args:
-        date_string: str
+        date_str: str
             a string in the format of a date
     Returns:
         `datetime.date`
     """
     # split string if it contains multiple datetimes
-    if '/' in date_string:
-        date_list = str.split(date_string, '/')
-        # only interested in the initial date sighted for now
-        date = pd.to_datetime(date_list[0]).date()
-    else:
-        date = pd.to_datetime(date_string).date()
-    return date
+    try:
+        if '/' in date_str:
+            date_list = str.split(date_str, '/')
+            # only interested in the initial date sighted for now
+            date = date_list[0]
+            # if date_str is in YYYY format, return just the year without adding month and day by default
+            date = pd.to_datetime(date).year if len(date) == 4 else pd.to_datetime(date).date()
+        else:
+            date = pd.to_datetime(date_str).year if len(date_str) == 4 else pd.to_datetime(date_str).date()
+        return date
+    except ValueError:
+        return f"Invalid date: {date_str}"
 
 
 def create_dataframe(response: requests.Response, endpoint_name: str, whale: str, start_date: str, end_date: str, param: Optional[str]=None):
@@ -162,7 +167,7 @@ def create_dataframe(response: requests.Response, endpoint_name: str, whale: str
 
 
 @obis_app.command('obis_request')
-def obis_request(whale: str, start_date: str, end_date: str, endpoint: str='occurrence', param: Optional[str]=None, json: bool=True, dataframe: bool=True, size: Optional[int]=5000) -> requests.Response:
+def obis_request(whale: str, start_date: str, end_date: str, endpoint: str='occurrence', param: Optional[str]=None, json: bool=True, dataframe: bool=True, size: Optional[int]=7000) -> requests.Response:
     """
     Send a get request to the obis api (https://api.obis.org/v3) to find information of encounters with a specified whale species.
 
