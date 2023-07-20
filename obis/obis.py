@@ -167,7 +167,7 @@ def create_dataframe(response: requests.Response, endpoint_name: str, whale: str
 
 
 @obis_app.command('obis_request')
-def obis_request(whale: str, start_date: str, end_date: str, endpoint: str='occurrence', param: Optional[str]=None, json: bool=True, dataframe: bool=True, size: Optional[int]=7000) -> requests.Response:
+def obis_request(whale: str, start_date: str, end_date: str, endpoint: str='occurrence', param: Optional[str]=None, json: bool=True, dataframe: bool=True, size: Optional[int]=10000) -> requests.Response:
     """
     Send a get request to the obis api (https://api.obis.org/v3) to find information of encounters with a specified whale species.
 
@@ -187,7 +187,7 @@ def obis_request(whale: str, start_date: str, end_date: str, endpoint: str='occu
         dataframe: bool, default True
             Save response to `pandas.DataFrame`
         size: (optional) int
-            Maximum number of results allowed to be returned from response
+            Maximum number of results allowed to be returned from response. Limited to 10,000
     Returns:
         `requests.Response`
     """
