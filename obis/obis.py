@@ -138,7 +138,7 @@ def create_dataframe(response: requests.Response, whale: str, start_date: str, e
     df.to_csv(f'{output_dir}/{start_date}--{end_date}.csv', index=False)
     return df
 
-
+@obis_app.command('merge')
 def merge_data(whale: str) -> pd.DataFrame:
     """
     Create and save a merged dataframe from related csv files
@@ -153,10 +153,11 @@ def merge_data(whale: str) -> pd.DataFrame:
     
     csv_list = [file for file in output_dir.glob('*.csv')]
     df = pd.concat([pd.read_csv(csv) for csv in csv_list], ignore_index=True)
+    df.to_csv(f'{output_dir}/blue_whale-1758--2023.csv', index=False)
 
 
 @obis_app.command('obis_request')
-def obis_request(whale: str, start_date: str, end_date: str, json: bool=True, dataframe: bool=True) -> requests.Response:
+def obis_request(whale: str, start_date: str, end_date: str, json: bool=True, dataframe: bool=True, size: Optional[int]=10000) -> requests.Response:
     """
     Send a get request to the obis api (https://api.obis.org/v3) to find information of encounters with a specified whale species.
 
@@ -171,6 +172,8 @@ def obis_request(whale: str, start_date: str, end_date: str, json: bool=True, da
             Save response to a json file
         dataframe: bool, default True
             Save response to `pandas.DataFrame`
+        size: int, default 10,000
+            Maximum number of results returned in json response
     Returns:
         `requests.Response`
     """
@@ -181,7 +184,7 @@ def obis_request(whale: str, start_date: str, end_date: str, json: bool=True, da
     try:
         scientific_name = whale_list[whale]['scientific_name']
         print(scientific_name)
-        url = f'{api}/occurrence?scientificname={scientific_name}&startdate={start_date}&enddate={end_date}'
+        url = f'{api}/occurrence?scientificname={scientific_name}&startdate={start_date}&enddate={end_date}&size={size}'
         url = url.replace(' ', '%20')
         r = requests.get(url)
         print(r.status_code)
