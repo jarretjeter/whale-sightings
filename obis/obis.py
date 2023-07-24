@@ -12,6 +12,7 @@ from typing import Optional
 logging.basicConfig(format='[%(asctime)s][%(module)s:%(lineno)04d] : %(message)s', level=INFO, stream=sys.stderr)
 logger: logging.Logger = logging
 
+data_dir = './data'
 obis_app = typer.Typer(no_args_is_help=True)
 
 
@@ -26,44 +27,13 @@ def filter_keys(response: requests.Response) -> tuple:
     """
     # Relevant keys to keep
     key_list = [
-    'occurrenceID',
-    'verbatimEventDate',
-    'eventDate',
-    'eventTime',
-    'year',
-    'month',
-    'day',
-    'decimalLatitude',  
-    'decimalLongitude',
-    'coordinatePrecision', 
-    'coordinateUncertaintyInMeters',  
-    'locality',
-    'waterBody',
-    'bathymetry',
-    'sst',
-    'sss',
-    'shoredistance',
-    'taxonRemarks',
-    'individualCount',  
-    'vernacularName',
-    'specificEpithet',
-    'scientificName', 
-    'scientificNameID',
-    'order',
-    'orderid',  
-    'family',
-    'familyid',  
-    'genus',
-    'genusid',
-    'species', 
-    'speciesid',
-    'rightsHolder',
-    'ownerInstitutionCode',
-    'recordedBy',
-    'associatedMedia', 
-    'basisOfRecord',  
-    'occurrenceRemarks',  
-    'bibliographicCitation'
+    'occurrenceID', 'verbatimEventDate', 'eventDate', 'eventTime', 'year', 'month', 'day',
+    'decimalLatitude', 'decimalLongitude', 'coordinatePrecision', 'coordinateUncertaintyInMeters',  
+    'locality', 'waterBody', 'bathymetry', 'sst', 'sss', 'shoredistance', 'taxonRemarks',
+    'individualCount', 'vernacularName', 'specificEpithet', 'scientificName', 
+    'scientificNameID', 'order', 'orderid', 'family', 'familyid', 'genus', 'genusid',
+    'species', 'speciesid', 'rightsHolder', 'ownerInstitutionCode', 'recordedBy','associatedMedia', 
+    'basisOfRecord', 'occurrenceRemarks', 'bibliographicCitation'
     ]
     response = response.json()
     response_list = response['results']
@@ -91,7 +61,6 @@ def output_json(response: requests.Response, endpoint_name: str, whale: str, sta
     Returns:
         None
     """
-    data_dir = './data'
     if param != None:
         output_dir = Path(f'{data_dir}/{endpoint_name}/{param}/{whale}')
     else:
@@ -101,6 +70,22 @@ def output_json(response: requests.Response, endpoint_name: str, whale: str, sta
     with open(f'{output_dir}/{start_date}--{end_date}.json', 'w') as file:
         logger.info(f"Saving response to json file: '{file.name}'")
         json.dump(response.json(), file, ensure_ascii=False, indent=4)
+
+
+def fill_ids(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Fill in NaN values for occurrenceID column
+
+    Args:
+        df: pd.DataFrame
+            DataFrame to operate on
+    Returns:
+        pd.DataFrame
+    """
+    nan_indices = df[df['occurrenceID'].isnull()].index
+    for i, index in enumerate(nan_indices, start=1):
+        df.loc[index, 'occurrenceID'] = -i
+    return df
 
 
 def convert_dates(date_str: str) -> datetime.date:
@@ -151,7 +136,6 @@ def create_dataframe(response: requests.Response, endpoint_name: str, whale: str
     filtered = filter_keys(response)
     response_list = filtered[0]
     key_list = filtered[1]
-    data_dir = './data'
     if param != None:
         output_dir = Path(f'{data_dir}/{endpoint_name}/{param}/{whale}')
     else:
@@ -160,10 +144,36 @@ def create_dataframe(response: requests.Response, endpoint_name: str, whale: str
     output_dir.mkdir(parents=True, exist_ok=True)
     df = pd.json_normalize(response_list)
     df = df.reindex(columns=key_list)
+    fill_ids(df)
+    # Rows with duplicate event dates, latitude, and longitude are likely the same event
     df['eventDate'] = df['eventDate'].apply(convert_dates)
+    df = df.drop_duplicates(subset=['eventDate', 'decimalLatitude', 'decimalLongitude'], keep='first')
     logger.info(f"Saving dataframe to csv: '{output_dir}/{start_date}--{end_date}.csv'")
     df.to_csv(f'{output_dir}/{start_date}--{end_date}.csv', index=False)
     return df
+
+
+def merge_data(whale: str, endpoint_name: str='occurrence', param: Optional[str]=None) -> pd.DataFrame:
+    """
+    Create and save a merged dataframe from related csv files
+    
+    Args:
+        whale: str
+            whale species folder to filter by
+        endpoint_name: str
+            endpoint folder to filter by
+        param: str
+            endpoint parameter folder to filter by
+    Returns:
+        pd.DataFrame
+    """
+    if param != None:
+        output_dir = Path(f'{data_dir}/{endpoint_name}/{param}/{whale}')
+    else:
+        output_dir = Path(f'{data_dir}/{endpoint_name}/{whale}')
+    
+    csv_list = [file for file in output_dir.glob('*.csv')]
+    df = pd.concat([pd.read_csv(csv) for csv in csv_list], ignore_index=True)
 
 
 @obis_app.command('obis_request')
