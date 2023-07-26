@@ -27,13 +27,12 @@ def filter_keys(response: requests.Response) -> tuple:
     """
     # Relevant keys to keep
     key_list = [
-    'occurrenceID', 'verbatimEventDate', 'eventDate', 'eventTime', 'year', 'month', 'day',
+    'occurrenceID', 'verbatimEventDate', 'eventDate', 'eventTime',
     'decimalLatitude', 'decimalLongitude', 'coordinatePrecision', 'coordinateUncertaintyInMeters',  
-    'locality', 'waterBody', 'bathymetry', 'sst', 'sss', 'shoredistance', 'taxonRemarks',
-    'individualCount', 'vernacularName', 'specificEpithet', 'scientificName', 
-    'scientificNameID', 'order', 'orderid', 'family', 'familyid', 'genus', 'genusid',
-    'species', 'speciesid', 'rightsHolder', 'ownerInstitutionCode', 'recordedBy','associatedMedia', 
-    'basisOfRecord', 'occurrenceRemarks', 'bibliographicCitation'
+    'locality', 'waterBody', 'bathymetry', 'sst', 'sss', 'shoredistance', 'taxonRemarks', 'individualCount', 'vernacularName', 
+    'order', 'orderid', 'family', 'familyid', 
+    'genus', 'genusid','species', 'speciesid',
+    'rightsHolder', 'ownerInstitutionCode', 'recordedBy','associatedMedia', 'basisOfRecord', 'occurrenceRemarks', 'bibliographicCitation'
     ]
     response = response.json()
     response_list = response['results']
@@ -41,7 +40,7 @@ def filter_keys(response: requests.Response) -> tuple:
     return filtered_response_list, key_list
 
 
-def output_json(response: requests.Response, whale: str, start_date: str, end_date: str):
+def output_json(response: requests.Response, whale: str, start_date: str, end_date: str) -> None:
     """
     Save a `requests.Response` to a json file
 
@@ -106,7 +105,7 @@ def convert_dates(date_str: str) -> datetime.date:
         return f"Invalid date: {date_str}"
 
 
-def create_dataframe(response: requests.Response, whale: str, start_date: str, end_date: str):
+def create_dataframe(response: requests.Response, whale: str, start_date: str, end_date: str) -> pd.DataFrame:
     """
     Create a `pandas.DataFrame` from Obis API response
 
@@ -131,6 +130,7 @@ def create_dataframe(response: requests.Response, whale: str, start_date: str, e
     df = pd.json_normalize(response_list)
     df = df.reindex(columns=key_list)
     fill_ids(df)
+    df['vernacularName'] = df['vernacularName'].fillna('Blue Whale')
     # Rows with duplicate event dates, latitude, and longitude are likely the same event
     df['eventDate'] = df['eventDate'].apply(convert_dates)
     df = df.drop_duplicates(subset=['eventDate', 'decimalLatitude', 'decimalLongitude'], keep='first')
