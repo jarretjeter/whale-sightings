@@ -131,12 +131,15 @@ def create_dataframe(response: requests.Response, whale: str, start_date: str, e
     df = df.reindex(columns=key_list)
     fill_ids(df)
     df['vernacularName'] = df['vernacularName'].fillna('Blue Whale')
+    # For missing count, report at least one whale was spotted
+    df['individualCount'] = df['individualCount'].fillna(1)
     # Rows with duplicate event dates, latitude, and longitude are likely the same event
     df['eventDate'] = df['eventDate'].apply(convert_dates)
     df = df.drop_duplicates(subset=['eventDate', 'decimalLatitude', 'decimalLongitude'], keep='first')
     logger.info(f"Saving dataframe to csv: '{output_dir}/{start_date}--{end_date}.csv'")
     df.to_csv(f'{output_dir}/{start_date}--{end_date}.csv', index=False)
     return df
+
 
 @obis_app.command('merge')
 def merge_data(whale: str) -> pd.DataFrame:
