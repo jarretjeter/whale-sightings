@@ -97,23 +97,23 @@ def to_mysql(whale: str, filename: str) -> None:
     """
     df = pd.read_csv(f'{parent_dir}/data/{whale}/{filename}')
     try:
-        for row in df.itertuples(index=False):
-
-            conn = pymysql.connect(host='localhost',
-                                user=user,
-                                password=password,
-                                database=db_name,
-                                cursorclass=pymysql.cursors.DictCursor)
-            with conn:
-                with conn.cursor() as cursor:
-                    insert_occurrences(row, cursor)
-                    insert_species(row, cursor)
-                conn.commit()
+        conn = pymysql.connect(host='localhost',
+                            user=user,
+                            password=password,
+                            database=db_name,
+                            cursorclass=pymysql.cursors.DictCursor)
+                            
+        with conn.cursor() as cursor:
+            for row in df.itertuples(index=False):
+                insert_occurrences(row, cursor)
+                insert_species(row, cursor)
+                
+            conn.commit()
     except pymysql.Error as e:
         logger.info(e)
         conn.rollback()
 
-
+    conn.close()
 
 if __name__ == '__main__':
     storage()
