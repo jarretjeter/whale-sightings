@@ -5,6 +5,9 @@ venv/
 
 
 # Files
+notes.txt
 obis.ipynb
 overview.txt
+processing.ipynb
 rel_data.md
+storage/config.json
