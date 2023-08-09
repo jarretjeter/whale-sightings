@@ -97,6 +97,7 @@ def to_mysql(whale: str, filename: str) -> None:
     """
     df = pd.read_csv(f'{parent_dir}/data/{whale}/{filename}')
     try:
+        logger.info('Inserting rows.')
         conn = pymysql.connect(host='localhost',
                             user=user,
                             password=password,
@@ -107,13 +108,15 @@ def to_mysql(whale: str, filename: str) -> None:
             for row in df.itertuples(index=False):
                 insert_occurrences(row, cursor)
                 insert_species(row, cursor)
-                
+
             conn.commit()
     except pymysql.Error as e:
         logger.info(e)
         conn.rollback()
 
     conn.close()
+    logger.info('Inserts completed.')
+
 
 if __name__ == '__main__':
     storage()
