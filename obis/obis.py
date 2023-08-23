@@ -121,16 +121,15 @@ def create_dataframe(response: requests.Response, whale: str, start_date: str, e
     Returns:
         `pandas.DataFrame`
     """
-    filtered = filter_keys(response)
-    response_list = filtered[0]
-    key_list = filtered[1]
+    response_list, key_list = filter_keys(response)
     output_dir = Path(f'{data_dir}/{whale}')
 
     output_dir.mkdir(parents=True, exist_ok=True)
     df = pd.json_normalize(response_list)
     df = df.reindex(columns=key_list)
     fill_ids(df)
-    df['vernacularName'] = df['vernacularName'].fillna('Blue Whale')
+    whale = whale.replace('_', ' ').title()
+    df['vernacularName'] = df['vernacularName'].fillna(whale)
     # For missing count, report at least one whale was spotted
     df['individualCount'] = df['individualCount'].fillna(1)
     # Rows with duplicate event dates, latitude, and longitude are likely the same event
