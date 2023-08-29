@@ -56,7 +56,7 @@ def insert_occurrences(row, cursor: pymysql.cursors.DictCursor) -> None:
                     (`id`, `eventDate`, `latitude`, `longitude`, `individualCount`)
                     VALUES (%s, %s, %s, %s, %s)
                     ON DUPLICATE KEY
-                    UPDATE eventDate=VALUES(eventDate), latitude=VALUES(latitude), longitude=VALUES(longitude), individualCount=VALUES(individualCount)"""
+                    UPDATE eventDate=VALUES(eventDate), latitude=VALUES(latitude), longitude=VALUES(longitude), speciesId=VALUES(speciesId), individualCount=VALUES(individualCount)"""
         cursor.execute(sql, (row.occurrenceID, eventDate, row.decimalLatitude, row.decimalLongitude, row.individualCount))
 
 
@@ -96,6 +96,7 @@ def to_mysql(whale: str, filename: str) -> None:
         None
     """
     df = pd.read_csv(f'{parent_dir}/data/{whale}/{filename}')
+    df['waterBody'] = df['waterBody'].apply(lambda x: None if pd.isna(x) else x)
     try:
         logger.info('Inserting rows.')
         conn = pymysql.connect(host='localhost',
@@ -106,16 +107,18 @@ def to_mysql(whale: str, filename: str) -> None:
                             
         with conn.cursor() as cursor:
             for row in df.itertuples(index=False):
+                cursor.callproc('insert_or_update_location', (row.waterBody,))
                 insert_occurrences(row, cursor)
                 insert_species(row, cursor)
 
             conn.commit()
+
+        conn.close()
+        logger.info('Inserts completed.')
     except pymysql.Error as e:
         logger.info(e)
         conn.rollback()
 
-    conn.close()
-    logger.info('Inserts completed.')
 
 
 if __name__ == '__main__':
