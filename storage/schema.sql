@@ -47,10 +47,12 @@ CREATE TABLE `occurrences` (
   PRIMARY KEY (`id`),
   CONSTRAINT `fk_waterBodyId`
   FOREIGN KEY (`waterBodyId`)
-  REFERENCES `locations`(`id`),
+  REFERENCES `locations`(`id`)
+  ON UPDATE CASCADE,
   CONSTRAINT `fk_speciesId`
   FOREIGN KEY (`speciesId`)
   REFERENCES `species`(`id`)
+  ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
