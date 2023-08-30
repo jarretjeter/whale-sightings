@@ -1,9 +1,9 @@
 DELIMITER //
 CREATE PROCEDURE insert_or_update_location(wb_name VARCHAR(255))
+-- Procedure for handling logic of creating ids for location table rows based on unique name values
 BEGIN
     DECLARE highest_id INT DEFAULT -1;
     DECLARE name_exists INT DEFAULT 0;
-    DECLARE local_wb_id INT DEFAULT 0;
 
     -- Unique constraint doesn't work on NULL values.
     -- check if the name is NULL and if a NULL already exists
@@ -21,22 +21,8 @@ BEGIN
         ON DUPLICATE KEY UPDATE waterBody=wb_name;
     END IF;
 
-    SELECT id INTO local_wb_id FROM locations WHERE waterBody = wb_name;
-
-    SELECT local_wb_id AS wb_id;
-END;
-//
-
-CREATE PROCEDURE insert_or_update_species(s_id INT, s_name VARCHAR(50), v_name VARCHAR(50))
-BEGIN
-    DECLARE local_species_id INT DEFAULT 0;
-
-    INSERT INTO species(id, speciesName, vernacularName) VALUES(s_id, s_name, v_name)
-    ON DUPLICATE KEY UPDATE speciesName=s_name, vernacularName=v_name;
-
-    SELECT s_id INTO local_species_id;
-
-    SELECT local_species_id AS speciesId;
+    -- return the value of id that was just inserted for foreign key insert in occurrences table
+    SELECT highest_id + 1 AS wb_id;
 END;
 //
 DELIMITER ;

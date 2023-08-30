@@ -26,27 +26,28 @@ password = local_db['password']
 db_name = local_db['db_name']
 
 
-def insert_occurrences(row, waterBodyId, speciesId, cursor: pymysql.cursors.DictCursor) -> None:
+def insert_occurrences(row, waterBodyId, cursor: pymysql.cursors.DictCursor) -> None:
     """
     Insert pd.DataFrame row values into MySQL occurrences table
 
     Args:
         row: pd.DataFrame
             row to read
+        waterBodyId: int
+            foreign key value returned from stored procedure
         cursor: PyMySQL DictCursor object
             executes SQL statement
     Returns:
         None
     """
-    
     # If eventDate is not in the format of `YYYY`
     if len(str(row.eventDate)) != 4:
         sql = """INSERT INTO `occurrences` 
                     (`id`, `eventDate`, `waterBodyId`, `latitude`, `longitude`, `speciesId`, `individualCount`)
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
                     ON DUPLICATE KEY
-                    UPDATE eventDate=VALUES(eventDate), latitude=VALUES(latitude), longitude=VALUES(longitude),  individualCount=VALUES(individualCount)"""
-        cursor.execute(sql, (row.occurrenceID, row.eventDate, waterBodyId, row.decimalLatitude, row.decimalLongitude, speciesId, row.individualCount))
+                    UPDATE eventDate=VALUES(eventDate), latitude=VALUES(latitude), longitude=VALUES(longitude), individualCount=VALUES(individualCount)"""
+        cursor.execute(sql, (row.occurrenceID, row.eventDate, waterBodyId, row.decimalLatitude, row.decimalLongitude, row.speciesid, row.individualCount))
 
     # If in `YYYY` format, default to -00-00 for `mm-dd` values
     else:
@@ -57,7 +58,7 @@ def insert_occurrences(row, waterBodyId, speciesId, cursor: pymysql.cursors.Dict
                     VALUES (%s, %s, %s, %s, %s, %s, %s)
                     ON DUPLICATE KEY
                     UPDATE eventDate=VALUES(eventDate), latitude=VALUES(latitude), longitude=VALUES(longitude), individualCount=VALUES(individualCount)"""
-        cursor.execute(sql, (row.occurrenceID, eventDate, waterBodyId, row.decimalLatitude, row.decimalLongitude, speciesId, row.individualCount))
+        cursor.execute(sql, (row.occurrenceID, eventDate, waterBodyId, row.decimalLatitude, row.decimalLongitude, row.speciesid, row.individualCount))
 
 
 def insert_species(row, cursor: pymysql.cursors.DictCursor) -> None:
@@ -110,10 +111,8 @@ def to_mysql(whale: str, filename: str) -> None:
                 cursor.callproc('insert_or_update_location', (row.waterBody,))
                 result = cursor.fetchone()
                 waterBodyId = result['wb_id'] if result else None
-                cursor.callproc('insert_or_update_species', (row.speciesid, row.species, row.vernacularName))
-                result = cursor.fetchone()
-                speciesId = result['speciesId'] if result else None
-                insert_occurrences(row, waterBodyId, speciesId, cursor)
+                insert_species(row, cursor)
+                insert_occurrences(row, waterBodyId, cursor)
 
             conn.commit()
 
