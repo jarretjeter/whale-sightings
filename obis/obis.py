@@ -179,12 +179,13 @@ def obis_request(whale: str, start_date: str, end_date: str, json: bool=True, da
     Returns:
         `requests.Response`
     """
-    whale_list = {'blue_whale': {'scientific_name': 'Balaenoptera musculus'}, 'sperm_whale': {'scientific_name': 'Physeter macrocephalus'}}
-    assert whale in whale_list, f'Enter a whale from whale_list: {whale_list}'
+    whales = {'blue_whale': {'scientific_name': 'Balaenoptera musculus'}, 'sperm_whale': {'scientific_name': 'Physeter macrocephalus'}}
+    if whale not in whales:
+        raise ValueError(f'{whale} not in whales. Choose a whale from whales. \n{whales.keys()}')
     
     api = 'https://api.obis.org/v3'
     try:
-        scientific_name = whale_list[whale]['scientific_name']
+        scientific_name = whales[whale]['scientific_name']
         print(scientific_name)
         url = f'{api}/occurrence?scientificname={scientific_name}&startdate={start_date}&enddate={end_date}&size={size}'
         url = url.replace(' ', '%20')
