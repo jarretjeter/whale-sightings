@@ -10,7 +10,6 @@ from typing import Optional
 logging.basicConfig(format='[%(asctime)s][%(module)s:%(lineno)04d] : %(message)s', level=INFO, stream=sys.stderr)
 logger: logging.Logger = logging
 
-data_dir = './data'
 
 
 class Obis():
@@ -18,7 +17,7 @@ class Obis():
     (https://obis.org/)
     """
     whales = {'blue_whale': {'scientific_name': 'Balaenoptera musculus'}, 'sperm_whale': {'scientific_name': 'Physeter macrocephalus'}}
-
+    data_dir = './data'
 
     def __init__(self, whale: str, start_date: str, end_date: str, size: Optional[int]=10000) -> None:
         """
@@ -30,12 +29,11 @@ class Obis():
             end_date: str
                 end date to query from in the format of `YYYY-MM-DD`
             size: int, default 10,000
-                Maximum number of allowed results returned
-        """
-        if whale in Obis.whales:
+                Maximum number of allowed results returned"""
+        if whale in self.whales:
             self.whale = whale
         else:
-            raise ValueError(f'{whale} not in whales dictionary. {Obis.whales.keys()}')
+            raise ValueError(f'{whale} not in whales dictionary. {self.whales.keys()}')
         self.start = start_date
         self.end = end_date
         self.size = size
@@ -64,7 +62,7 @@ class Obis():
         whale = self.whale
         start = self.start
         end = self.end
-
+        data_dir = self.data_dir
         # Only call Obis.get() if the object doesn't currently have the 'response' attribute
         if not hasattr(self, 'response'):
             self.get()
