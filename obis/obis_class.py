@@ -8,7 +8,7 @@ import sys
 from typing import Optional
 
 logging.basicConfig(format='[%(asctime)s][%(module)s:%(lineno)04d] : %(message)s', level=INFO, stream=sys.stderr)
-logger: logging.Logger = logging
+logger = logging.getLogger(__name__)
 
 
 
@@ -29,7 +29,8 @@ class Obis():
             end_date: str
                 end date to query from in the format of `YYYY-MM-DD`
             size: int, default 10,000
-                Maximum number of allowed results returned"""
+                Maximum number of allowed results returned
+        """
         if whale in self.whales:
             self.whale = whale
         else:
@@ -41,7 +42,8 @@ class Obis():
 
 # ERROR HANDLE STATUS CODES
     def get(self) -> None:
-        """Send a get request to the OBIS api"""
+        """Send a get request to the OBIS api
+        """
         whale = self.whale
         start = self.start
         end = self.end
@@ -58,7 +60,8 @@ class Obis():
 
 
     def save_json(self) -> None:
-        """Save a `requests.Response` to a json file"""
+        """Save a `requests.Response` to a json file
+        """
         whale = self.whale
         start = self.start
         end = self.end
