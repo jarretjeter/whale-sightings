@@ -19,17 +19,18 @@ class Obis():
     whales = {'blue_whale': {'scientific_name': 'Balaenoptera musculus'}, 'sperm_whale': {'scientific_name': 'Physeter macrocephalus'}}
     data_dir = './data'
 
-    def __init__(self, whale: str, start_date: str, end_date: str, size: Optional[int]=10000) -> None:
+    def __init__(self, whale: str, start_date: Optional[str]=None, end_date: Optional[str]=None, size: Optional[int]=10000) -> None:
         """
         Args:
             whale: str
                 Whale for the api to query
-            start_date: str
-                initial date to query from in the format of `YYYY-MM-DD`
-            end_date: str
-                end date to query from in the format of `YYYY-MM-DD`
+            start_date, end_date: str, default None
+                start and end dates to query through, in the format of `YYYY-MM-DD`.
+                Both parameters must be set to None, or a date format. 
+                If None, all dates on record will be queried
             size: int, default 10,000
                 Maximum number of allowed results returned
+                The API does not accept a size limit greater than 10,000
         """
         if whale in self.whales:
             self.whale = whale
@@ -49,14 +50,33 @@ class Obis():
         end = self.end
         size = self.size
         try:
-            scientific_name = Obis.whales[whale]['scientific_name']
-            url = f'https://api.obis.org/v3/occurrence?scientificname={scientific_name}&startdate={start}&enddate={end}&size={size}'
-            url = url.replace(' ', '%20')
-            response = requests.get(url)
-            print(response.status_code)
-            self.response = response
+            if start is None and end is None:
+                scientific_name = self.whales[whale]['scientific_name']
+                # request earliest and latest records to get a start and end date
+                url = f'https://api.obis.org/v3/statistics/years?scientificname={scientific_name}'
+                r = requests.get(url)
+                print(r.status_code)
+                years = r.json()
+                start = str(years[0]['year'])
+                start = start + '-01-01'
+                end = str(years[-1]['year'])
+                end = end + '-12-31'
+                # query occurrence endpoint with start and end date set
+                url = f'https://api.obis.org/v3/occurrence?scientificname={scientific_name}&startdate={start}&enddate={end}&size={size}'
+                url = url.replace(' ', '%20')
+                r = requests.get(url)
+                print(r.status_code)
+                self.response = r
+            else:
+                scientific_name = self.whales[whale]['scientific_name']
+                url = f'https://api.obis.org/v3/occurrence?scientificname={scientific_name}&startdate={start}&enddate={end}&size={size}'
+                url = url.replace(' ', '%20')
+                r = requests.get(url)
+                print(r.status_code)
+                self.response = r
         except requests.exceptions.RequestException as e:
             logger.info(e)
+
 
 
     def save_json(self) -> None:
