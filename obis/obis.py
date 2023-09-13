@@ -1,206 +1,132 @@
+from dateutil.parser import parse
 import datetime
 import json
 import logging
 from logging import INFO
-import pandas as pd
 from pathlib import Path
 import requests
 import sys
-import typer
 from typing import Optional
 
 logging.basicConfig(format='[%(asctime)s][%(module)s:%(lineno)04d] : %(message)s', level=INFO, stream=sys.stderr)
-logger: logging.Logger = logging
-
-data_dir = './data'
-obis_app = typer.Typer(no_args_is_help=True)
+logger = logging.getLogger(__name__)
 
 
-def filter_keys(response: requests.Response) -> tuple:
-    """
-    Remove irrelevant keys from returned response
+
+class Obis():
+    """Object for working with specific OBIS api endpoints (https://api.obis.org/v3)
     
-    Args:
-        response: `requests.Response`
-    Returns:
-        tuple[list[dict], list]
-    """
-    # Relevant keys to keep
-    key_list = [
-    'occurrenceID', 'verbatimEventDate', 'eventDate', 'eventTime',
-    'decimalLatitude', 'decimalLongitude', 'coordinatePrecision', 'coordinateUncertaintyInMeters',  
-    'locality', 'waterBody', 'bathymetry', 'sst', 'sss', 'shoredistance', 'taxonRemarks', 'individualCount', 'vernacularName', 
-    'order', 'orderid', 'family', 'familyid', 
-    'genus', 'genusid','species', 'speciesid',
-    'rightsHolder', 'ownerInstitutionCode', 'recordedBy','associatedMedia', 'basisOfRecord', 'occurrenceRemarks', 'bibliographicCitation'
-    ]
-    response = response.json()
-    response_list = response['results']
-    filtered_response_list = [{k:v for k, v in d.items() if k in key_list} for d in response_list if isinstance(d, dict)]
-    return filtered_response_list, key_list
-
-
-def output_json(response: requests.Response, whale: str, start_date: str, end_date: str) -> None:
-    """
-    Save a `requests.Response` to a json file
-
-    Args:
-        response: `requests.Response`
-            response object to read
-        whale: str
-            final subdirectory name
-        start_date: str
-            part of filename
-        end_date: str
-            part of filename
-    Returns:
-        None
-    """
-    output_dir = Path(f'{data_dir}/{whale}')
-
-    output_dir.mkdir(parents=True, exist_ok=True)
-    with open(f'{output_dir}/{start_date}--{end_date}.json', 'w') as file:
-        logger.info(f"Saving response to json file: '{file.name}'")
-        json.dump(response.json(), file, ensure_ascii=False, indent=4)
-
-
-def fill_ids(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Fill in NaN values for occurrenceID column
-
-    Args:
-        df: pd.DataFrame
-            DataFrame to operate on
-    Returns:
-        pd.DataFrame
-    """
-    nan_indices = df[df['occurrenceID'].isnull()].index
-    for i, index in enumerate(nan_indices, start=1):
-        df.loc[index, 'occurrenceID'] = -i
-    return df
-
-
-def convert_dates(date_str: str) -> datetime.date:
-    """
-    convert eventDate column strings to datetime.date
-
-    Args:
-        date_str: str
-            a string in the format of a date
-    Returns:
-        `datetime.date`
-    """
-    # split string if it contains multiple datetimes
-    try:
-        if '/' in date_str:
-            date_list = str.split(date_str, '/')
-            # only interested in the initial date sighted for now
-            date = date_list[0]
-            # if date_str is in YYYY format, return just the year without adding month and day by default
-            date = pd.to_datetime(date).year if len(date) == 4 else pd.to_datetime(date).date()
-        else:
-            date = pd.to_datetime(date_str).year if len(date_str) == 4 else pd.to_datetime(date_str).date()
-        return date
-    except ValueError:
-        return f"Invalid date: {date_str}"
-
-
-def create_dataframe(response: requests.Response, whale: str, start_date: str, end_date: str) -> pd.DataFrame:
-    """
-    Create a `pandas.DataFrame` from Obis API response
-
-    Args:
-        response: `requests.Response`
-            response object to read
-        whale: str
-            final subdirectory name
-        start_date: str
-            part of filename
-        end_date: str
-            part of filename
-    Returns:
-        `pandas.DataFrame`
-    """
-    response_list, key_list = filter_keys(response)
-    output_dir = Path(f'{data_dir}/{whale}')
-
-    output_dir.mkdir(parents=True, exist_ok=True)
-    df = pd.json_normalize(response_list)
-    df = df.reindex(columns=key_list)
-    fill_ids(df)
-    whale = whale.replace('_', ' ').title()
-    df['vernacularName'] = df['vernacularName'].fillna(whale)
-    # For missing count, report at least one whale was spotted
-    df['individualCount'] = df['individualCount'].fillna(1)
-    # Rows with duplicate event dates, latitude, and longitude are likely the same event
-    df['eventDate'] = df['eventDate'].apply(convert_dates)
-    df = df.drop_duplicates(subset=['eventDate', 'decimalLatitude', 'decimalLongitude'], keep='first')
-    logger.info(f"Saving dataframe to csv: '{output_dir}/{start_date}--{end_date}.csv'")
-    df.to_csv(f'{output_dir}/{start_date}--{end_date}.csv', index=False)
-    return df
-
-
-@obis_app.command('merge')
-def merge_data(whale: str) -> pd.DataFrame:
-    """
-    Create and save a merged dataframe from related csv files
-    
-    Args:
-        whale: str
-            whale species folder to filter by
-    Returns:
-        pd.DataFrame
-    """
-    output_dir = Path(f'{data_dir}/{whale}')
-    
-    csv_list = [file for file in output_dir.glob('*.csv')]
-    df = pd.concat([pd.read_csv(csv) for csv in csv_list], ignore_index=True)
-    df.to_csv(f'{output_dir}/blue_whale-1758--2023.csv', index=False)
-
-
-@obis_app.command('obis_request')
-def obis_request(whale: str, start_date: str, end_date: str, json: bool=True, dataframe: bool=True, size: Optional[int]=10000) -> requests.Response:
-    """
-    Send a get request to the obis api (https://api.obis.org/v3) to find information of encounters with a specified whale species.
-
-    Args:
-        whale: str
-            Whale to filter by
-        start_date: str
-            Date to start search in the format of `YYYY-MM-DD`
-        end_date: str
-            Date to end search in the format of `YYYY-MM-DD`
-        json: bool, default True
-            Save response to a json file
-        dataframe: bool, default True
-            Save response to `pandas.DataFrame`
-        size: int, default 10,000
-            Maximum number of results returned in json response
-    Returns:
-        `requests.Response`
+    (https://obis.org/)
     """
     whales = {'blue_whale': {'scientific_name': 'Balaenoptera musculus'}, 'sperm_whale': {'scientific_name': 'Physeter macrocephalus'}}
-    if whale not in whales:
-        raise ValueError(f'{whale} not in whales. Choose a whale from whales. \n{whales.keys()}')
-    
-    api = 'https://api.obis.org/v3'
-    try:
-        scientific_name = whales[whale]['scientific_name']
-        print(scientific_name)
-        url = f'{api}/occurrence?scientificname={scientific_name}&startdate={start_date}&enddate={end_date}&size={size}'
-        url = url.replace(' ', '%20')
-        r = requests.get(url)
-        print(r.status_code)
-        if json:
-            output_json(response=r, whale=whale, start_date=start_date, end_date=end_date)
-        if dataframe:
-            create_dataframe(response=r, whale=whale, start_date=start_date, end_date=end_date)
-        return r
-    except requests.exceptions.RequestException as e:
+    data_dir = './data'
+
+    def __init__(self, whale: str, start_date: Optional[str]=None, end_date: Optional[str]=None, size: Optional[int]=10000) -> None:
+        """
+        Args:
+            whale: str
+                Whale for the api to query
+            start_date, end_date: str, default None
+                start and end dates to query through, in the format of `YYYY-MM-DD`.
+                Both parameters must be set to None, or a date format. 
+                If None, all dates on record will be queried
+            size: int, default 10,000
+                Maximum number of allowed results returned in json response
+                The API does not accept a size limit greater than 10,000
+        """
+        if whale in self.whales:
+            self.whale = whale
+        else:
+            raise ValueError(f'{whale} not in whales dictionary. {self.whales.keys()}')
+        self.start = start_date
+        self.end = end_date
+        self.size = size
+        
+
+    def get_records(self) -> tuple:
+        """Retrieve total number of records from a request to the /statistics endpoint
+        """
+        whale = self.whale
+        start = self.start
+        end = self.end
+        num_records = 0
+        try:
+            scientific_name = self.whales[whale]['scientific_name']
+            # request earliest and latest records to get a start and end date
+            url = f'https://api.obis.org/v3/statistics/years?scientificname={scientific_name}&startdate={start}&enddate={end}'
+            r = requests.get(url)
+            print(f'statistics/years status code: {r.status_code}')
+            records = r.json()
+            for record in records:
+                num_records = num_records + record['records']
+            return records, num_records
+        except requests.exceptions.RequestException as e:
             logger.info(e)
 
 
+# ERROR HANDLE STATUS CODES
+    def get_occurrences(self, start_date: str, end_date: str) -> None:
+        """Send a get request to the OBIS api's /occurrence endpoint
+        """
+        whale = self.whale
+        size = self.size
+        try:
+            scientific_name = self.whales[whale]['scientific_name']
+            url = f'https://api.obis.org/v3/occurrence?scientificname={scientific_name}&startdate={start_date}&enddate={end_date}&size={size}'
+            url = url.replace(' ', '%20')
+            r = requests.get(url)
+            print(r.status_code)
+            print(start_date, end_date)
+            self.response = r
+            self.save_json(start_date, end_date)
+        except requests.exceptions.RequestException as e:
+            logger.info(e)
 
 
-if __name__ == '__main__':
-    obis_app()
+    def save_json(self, start_date: str, end_date: str) -> None:
+        """Save a `requests.Response` to a json file
+        """
+        whale = self.whale
+        data_dir = self.data_dir
+        response = self.response
+        output_dir = Path(f'{data_dir}/{whale}')
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        with open(f'{output_dir}/{start_date}--{end_date}.json', 'w') as file:
+            logger.info(f'Saving json response to {file.name}')
+            json.dump(response.json(), file, ensure_ascii=False, indent=4)
+
+
+    def obis_requests(self) -> None:
+        """Send multiple requests to OBIS api depending on total records
+        of response"""
+        start = self.start
+        end = self.end
+        max_size = self.size
+        start_year = parse(start).year
+        end_year = parse(end).year
+        records, num_records = self.get_records()
+        print(f'max: {max_size}')
+        print(f'num_records: {num_records}')
+
+        if max_size <= num_records:
+            current_size = 0
+            for rec in records:
+                current_size += rec['records']
+                if current_size <= max_size:
+                    print(f"current_size: {current_size}, {rec['year']}")
+                    end = str(rec['year'])
+                    end = end + '-12-31'
+                    continue
+                else:
+                    print(f"end: {end}, current size {current_size}/{max_size}, {rec['year']}")
+                    self.get_occurrences(start, end)
+                    current_size = rec['records']
+                    print(f"Resetting, current_size: {current_size}, {rec['year']}")
+                    end_year = parse(end).year
+                    start = str(end_year + 1)
+                    start = start + '-01-01'
+                    print(f'start: {start}')
+            self.get_occurrences(start, end)
+        else:
+            self.get_occurrences(start, end)

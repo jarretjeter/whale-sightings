@@ -1,6 +1,6 @@
 import datetime as dt
 from manager import *
-from obis_class import *
+from obis import *
 
 
 def main():
