@@ -1,11 +1,12 @@
 import datetime
+from dateutil.parser import parse
 import geopandas as gpd
 import json
 import logging
 from logging import INFO
-from .obis_class import Obis
 import pandas as pd
 from pathlib import Path
+import re
 import sys
 
 logging.basicConfig(format='[%(asctime)s][%(module)s:%(lineno)04d] : %(message)s', level=INFO, stream=sys.stderr)
@@ -19,12 +20,14 @@ def load_oceans() -> gpd.GeoDataFrame:
     Returns:
         geopandas.GeoDataFrame
     """
+    logger.info('Loading ocean shapefile..')
     gdf = gpd.read_file('data/Global_Oceans_and_Seas_version_1/goas_v01.shp')
     return gdf
 
 
 class WhaleDataManager():
-    """Pandas and GeoPandas functionalities for handling whale data.
+    """Pandas and GeoPandas functionalities for handling whale data 
+    obtained from OBIS (https://obis.org/).
     """
     key_list = [
     'occurrenceID', 'verbatimEventDate', 'eventDate', 'eventTime', 'decimalLatitude', 'decimalLongitude', 'coordinatePrecision', 'coordinateUncertaintyInMeters',  
@@ -33,6 +36,7 @@ class WhaleDataManager():
     ]
     data_dir = './data'
     whales = {'blue_whale': {'scientific_name': 'Balaenoptera musculus'}, 'sperm_whale': {'scientific_name': 'Physeter macrocephalus'}}
+
 
     def __init__(self, whale: str, start_date: str, end_date: str) -> None:
         """
@@ -47,27 +51,52 @@ class WhaleDataManager():
         if whale in self.whales:
             self.whale = whale
         else:
-            raise ValueError(f'{whale} not in whales dictionary. {Obis.whales.keys()}')
+            raise ValueError(f'{whale} not in whales dictionary. {self.whales.keys()}')
         self.start = start_date
         self.end = end_date
 
 
+    def match_files(self) -> list:
+        """
+        Get json files that match the class instance's start and end date attributes
+
+        Returns:
+            list[Path]
+        """
+        start_year = parse(self.start).year
+        end_year = parse(self.end).year
+        whale_dir = Path(f'{self.data_dir}/{self.whale}')
+        files = list(whale_dir.glob('*.json'))
+        matched = []
+
+        for file in files:
+            match = re.search(r'(\d{4})-\d{2}-\d{2}\--(\d{4})-\d{2}-\d{2}', file.name)
+            if match:
+                file_start_year = int(match.group(1))
+                file_end_year = int(match.group(2))
+
+                if start_year <= file_start_year <= end_year and start_year <= file_end_year <= end_year:
+                    matched.append(file)
+        return matched
+
+
     def filter_keys(self) -> list:
         """
-        Remove irrelevant keys from returned response for later processing
+        Remove irrelevant keys from returned json response for later processing
         
         Returns:
-            list[dict]
+            list[list[dict]]
         """
-        whale = self.whale
-        start = self.start
-        end = self.end
         key_list = self.key_list
+        filtered_response = []
+        files = self.match_files()
         
-        response_file = open(f'{self.data_dir}/{whale}/{start}--{end}.json')
-        response = json.loads(response_file.read())
-        response_list = response['results']
-        filtered_response = [{k:v for k, v in d.items() if k in key_list} for d in response_list if isinstance(d, dict)]
+        response_files = [open(file, 'r') for file in files]
+        for file in response_files:
+            r = json.loads(file.read())
+            results = r['results']
+            results = [{k:v for k, v in d.items() if k in key_list} for d in results if isinstance(d, dict)]
+            filtered_response.append(results)
         return filtered_response
     
 
@@ -115,7 +144,7 @@ class WhaleDataManager():
                 date = pd.to_datetime(date_str).year if len(date_str) == 4 else pd.to_datetime(date_str).date()
             return date
         except ValueError:
-            return f'Invalid date: {date_str}'
+            logger.info(f'Invalid date: {date_str}')
 
 
     def get_status(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -153,6 +182,7 @@ class WhaleDataManager():
     def create_dataframe(self) -> pd.DataFrame:
         """
         Create a `pandas.DataFrame` of whale sighting data read from a json file
+        and save to a csv file
         
         Returns:
             `pd.DataFrame`
@@ -162,7 +192,7 @@ class WhaleDataManager():
         output_dir = Path(f'{self.data_dir}/{self.whale}')
         output_dir.mkdir(parents=True, exist_ok=True)
         
-        df = pd.json_normalize(filtered_response)
+        df = pd.concat(pd.json_normalize(r) for r in filtered_response)
         df = df.reindex(columns=key_list)
         # Rows with matching event dates, latitude, and longitude are likely the same event
         df = df.drop_duplicates(subset=['eventDate', 'decimalLatitude', 'decimalLongitude'], keep='first')
@@ -172,6 +202,5 @@ class WhaleDataManager():
         filename = f'{output_dir}/{self.start}--{self.end}.csv'
         logger.info(f'Saving dataframe to {filename}')
         df.to_csv(filename, index=False)
-    
         return df
     
