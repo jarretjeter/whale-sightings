@@ -128,6 +128,7 @@ class Obis():
                     print(f"current_size: {current_size}, {rec['year']}")
                     end = str(rec['year'])
                     end = end + '-12-31'
+                    continue
                 else:
                     print(f"end: {end}, current size {current_size}/{max_size}, {rec['year']}")
                     self.get_occurrences(start, end)
