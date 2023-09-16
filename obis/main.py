@@ -5,7 +5,7 @@ from obis import *
 
 def main():
     now = str(dt.datetime.now().date())
-    obis = Obis('blue_whale', '1758-01-01', now)
+    obis = Obis('blue_whale')
     obis.obis_requests()
     manager = WhaleDataManager('blue_whale', '1758-01-01', now)
     manager.create_dataframe()
