@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class ObisAPI():
-    """Object for working with specific OBIS api endpoints (https://api.obis.org/v3)
+    """Object for obtaining whale data from specific OBIS api endpoints (https://api.obis.org/v3)
     
     (https://obis.org/)
     """
@@ -28,8 +28,7 @@ class ObisAPI():
                 Whale for the api to query
             startdate, enddate: str, default None
                 start and end dates to query through, in the format of `YYYY-MM-DD`.
-                Both parameters must be set to None, or a date format. 
-                If None, all dates on record will be queried
+                If either are None, the earliest or latest records are retrieved.
             size: int, default 10,000
                 Maximum number of allowed results returned in json response
                 The API does not accept a size limit greater than 10,000
@@ -46,6 +45,9 @@ class ObisAPI():
 
     def get_records(self) -> tuple:
         """Retrieve total number of records from a request to the /statistics/years endpoint
+
+        Returns:
+            tuple[list[dict], int]
         """
         whale = self.whale
         num_records = 0
@@ -85,8 +87,8 @@ class ObisAPI():
         try:
             scientificname = self.whales[whale]['scientificname']
             r = requests.get(f"{url}/occurrence", params=params)
-            logger.info(f"/occurrence status code: {r.status_code}")
             logger.info(r.url)
+            logger.info(f"/occurrence status code: {r.status_code}")
             self.response = r
             self.save_json(startdate, enddate)
         except requests.exceptions.RequestException as e:
@@ -109,7 +111,7 @@ class ObisAPI():
 
     def api_requests(self) -> None:
         """Send multiple requests to OBIS api depending on total records
-        of response"""
+        of response and size limit"""
         startdate = self.startdate
         enddate = self.enddate
         max_size = self.size
