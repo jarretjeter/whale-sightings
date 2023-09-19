@@ -8,15 +8,13 @@ import sys
 import typer
 
 
-logging.basicConfig(format='[%(levelname)-5s][%(asctime)s][%(module)s:%(lineno)04d] : %(message)s',
-                    level=INFO,
-                    stream=sys.stderr)
-logger: logging.Logger = logging
+logging.basicConfig(format='[%(levelname)-5s][%(asctime)s][%(module)s:%(lineno)04d] : %(message)s', level=INFO, stream=sys.stderr)
+logger = logging.getLogger(__name__)
 
 storage = typer.Typer()
 
-parent_dir = Path().resolve()
-file = open('./storage/config.json', 'r')
+parent_dir = Path().cwd()
+file = open(f'{parent_dir}/storage/config.json', 'r')
 config = json.loads(file.read())
 
 # MySQL Configurations
@@ -83,7 +81,6 @@ def insert_species(row, cursor: pymysql.cursors.DictCursor) -> None:
     cursor.execute(sql, (row.speciesid, row.species, vernacularName))
 
 
-@storage.command('to_mysql')
 def to_mysql(whale: str, filename: str) -> None:
     """
     Insert pd.DataFrame rows into MySQL tables
