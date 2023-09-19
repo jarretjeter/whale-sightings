@@ -147,24 +147,9 @@ class WhaleDataManager():
             logger.info(f'Invalid date: {date_str}')
 
 
-    def get_status(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Determine if a whale was spotted alive or dead/hunted and 
-        create a bool column based on determination
-
-        Args: 
-            df: pd.DataFrame
-                DataFrame object to operate on
-        Returns:
-            `pd.DataFrame`
-        """
-        df['alive'] = df['waterBody'].notna()
-        return df
-
-
     def get_ocean(self, df: pd.DataFrame) -> pd.DataFrame:
         """Check for longitude/latitude point intersections 
-        from the OceanData.ocean geodataframe to get consistent ocean locations
+        between an ocean GeoDataFrame and whale GeoDataFrame to get consistent ocean locations
 
         Args: 
             df: pd.DataFrame
@@ -173,8 +158,11 @@ class WhaleDataManager():
             `pd.DataFrame`
         """
         ocean_gdf = load_oceans()
+        # Generate whale geodataframe with geometry point column using longitude(x),latitude(y) values
         points_df = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df['decimalLongitude'], df['decimalLatitude']), crs='EPSG:4326')
+        # Create joined_df from spatial join intersections between points and polygons
         joined_df = gpd.sjoin(points_df, ocean_gdf, how='left', predicate='intersects')
+        # Update waterBody names
         df['waterBody'] = joined_df['name']
         return df
 
