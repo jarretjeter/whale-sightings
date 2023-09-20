@@ -11,6 +11,11 @@ from typing import Optional
 logging.basicConfig(format='[%(asctime)s][%(module)s:%(lineno)04d] : %(message)s', level=INFO, stream=sys.stderr)
 logger = logging.getLogger(__name__)
 
+root_dir = Path().cwd()
+file = open(f"{root_dir}/config.json", 'r')
+config = json.loads(file.read())
+# Whales Dictionary
+whales = config['whales']
 
 
 class ObisAPI():
@@ -18,7 +23,6 @@ class ObisAPI():
     
     (https://obis.org/)
     """
-    whales = {'blue_whale': {'scientificname': 'Balaenoptera musculus'}, 'sperm_whale': {'scientificname': 'Physeter macrocephalus'}}
     data_dir = './data'
 
     def __init__(self, whale: str, startdate: Optional[str]=None, enddate: Optional[str]=None, size: Optional[int]=10000) -> None:
@@ -33,10 +37,10 @@ class ObisAPI():
                 Maximum number of allowed results returned in json response
                 The API does not accept a size limit greater than 10,000
         """
-        if whale in self.whales:
+        if whale in whales:
             self.whale = whale
         else:
-            raise ValueError(f'{whale} not in whales dictionary. {self.whales.keys()}')
+            raise ValueError(f'{whale} not in whales dictionary. {whales.keys()}')
         self.startdate = startdate
         self.enddate = enddate
         self.size = size
@@ -52,7 +56,7 @@ class ObisAPI():
         whale = self.whale
         num_records = 0
         url = f'https://api.obis.org/v3'
-        scientificname = self.whales[whale]['scientificname']
+        scientificname = whales[whale]['scientificname']
         params = {'scientificname': scientificname}
         if self.startdate:
             params['startdate'] = self.startdate
@@ -82,10 +86,10 @@ class ObisAPI():
         whale = self.whale
         size = self.size
         url = f'https://api.obis.org/v3'
-        scientificname = self.whales[whale]['scientificname']
+        scientificname = whales[whale]['scientificname']
         params = {'scientificname': scientificname, 'startdate': startdate, 'enddate': enddate, 'size': size}
         try:
-            scientificname = self.whales[whale]['scientificname']
+            scientificname = whales[whale]['scientificname']
             r = requests.get(f"{url}/occurrence", params=params)
             logger.info(r.url)
             logger.info(f"/occurrence status code: {r.status_code}")
