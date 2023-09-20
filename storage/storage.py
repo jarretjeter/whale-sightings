@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 
 storage = typer.Typer()
 
-parent_dir = Path().cwd()
-file = open(f'{parent_dir}/storage/config.json', 'r')
+root_dir = Path().cwd()
+file = open(f'{root_dir}/config.json', 'r')
 config = json.loads(file.read())
 
 # MySQL Configurations
@@ -22,6 +22,9 @@ local_db = config['database']['local']
 user = local_db['user']
 password = local_db['password']
 db_name = local_db['db_name']
+
+# Whales Dictionary
+whales = config['whales']
 
 
 def insert_occurrences(row, waterBodyId, cursor: pymysql.cursors.DictCursor) -> None:
@@ -71,7 +74,8 @@ def insert_species(row, cursor: pymysql.cursors.DictCursor) -> None:
     Returns:
         None
     """
-    species_dict = {'Balaenoptera musculus': 'Blue Whale', 'Physeter macrocephalus': 'Sperm Whale'}
+    # reverse whales dict to get vernacular name value
+    species_dict = {v['scientificname']: k.replace('_', ' ').title() for k, v in whales.items()}
     vernacularName = species_dict[row.species]
     sql = """INSERT INTO `species` 
                     (`id`, `speciesName`, `vernacularName`)
@@ -81,6 +85,7 @@ def insert_species(row, cursor: pymysql.cursors.DictCursor) -> None:
     cursor.execute(sql, (row.speciesid, row.species, vernacularName))
 
 
+@storage.command('to_mysql')
 def to_mysql(whale: str, filename: str) -> None:
     """
     Insert pd.DataFrame rows into MySQL tables
@@ -93,7 +98,7 @@ def to_mysql(whale: str, filename: str) -> None:
     Returns:
         None
     """
-    df = pd.read_csv(f'{parent_dir}/data/{whale}/{filename}')
+    df = pd.read_csv(f'{root_dir}/data/{whale}/{filename}')
     df['waterBody'] = df['waterBody'].apply(lambda x: None if pd.isna(x) else x)
     try:
         logger.info('Inserting rows.')

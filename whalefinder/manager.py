@@ -12,6 +12,11 @@ import sys
 logging.basicConfig(format='[%(asctime)s][%(module)s:%(lineno)04d] : %(message)s', level=INFO, stream=sys.stderr)
 logger = logging.getLogger(__name__)
 
+root_dir = Path().cwd()
+file = open(f"{root_dir}/config.json", 'r')
+config = json.loads(file.read())
+whales = config['whales']
+
 
 def load_oceans() -> gpd.GeoDataFrame:
     """
@@ -35,7 +40,6 @@ class WhaleDataManager():
     'genus', 'genusid','species', 'speciesid','rightsHolder', 'ownerInstitutionCode', 'recordedBy','associatedMedia', 'basisOfRecord', 'occurrenceRemarks', 'bibliographicCitation'
     ]
     data_dir = './data'
-    whales = {'blue_whale': {'scientific_name': 'Balaenoptera musculus'}, 'sperm_whale': {'scientific_name': 'Physeter macrocephalus'}}
 
 
     def __init__(self, whale: str, start_date: str, end_date: str) -> None:
@@ -48,10 +52,10 @@ class WhaleDataManager():
             end_date: str
                 Part of file path to search
         """
-        if whale in self.whales:
+        if whale in whales:
             self.whale = whale
         else:
-            raise ValueError(f'{whale} not in whales dictionary. {self.whales.keys()}')
+            raise ValueError(f'{whale} not in whales dictionary. {whales.keys()}')
         self.start = start_date
         self.end = end_date
 
