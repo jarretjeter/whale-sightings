@@ -1,0 +1,18 @@
+{
+    "database":
+        {
+            "local": 
+                {
+                    "user": "",
+                    "password": "",
+                    "db_name": ""
+                }
+        },
+        
+    "whales": 
+        {
+            "blue_whale": {"scientificname": "Balaenoptera musculus"}, 
+            "sperm_whale": {"scientificname": "Physeter macrocephalus"}, 
+            "beluga_whale": {"scientificname": "Delphinapterus leucas"}
+        }
+}
