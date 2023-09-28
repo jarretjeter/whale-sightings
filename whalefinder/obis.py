@@ -4,6 +4,7 @@ import json
 import logging
 from logging import INFO
 from pathlib import Path
+import re
 import requests
 import sys
 from typing import Optional
@@ -79,6 +80,28 @@ class ObisAPI():
             logger.info(e)
 
 
+    def is_dateformat(self, date_strings: tuple) -> tuple:
+        """Checks for date formats (YYYY-mm-dd)
+        
+        Args:
+            date_strings: tuple[str, str]
+                tuple of string values
+        Returns:
+            tuple of converted strings
+        """
+        start = date_strings[0]
+        end = date_strings[1]
+        if re.match(r"\d{4}-\d{2}-\d{2}", start):
+            pass
+        else:
+            start = str(start) + '-01-01'
+        if re.match(r"\d{4}-\d{2}-\d{2}", end):
+            pass
+        else:
+            end = str(end) + '-12-31'
+        return start, end
+
+
 # ERROR HANDLE STATUS CODES
     def get_occurrences(self, startdate: str, enddate: str) -> None:
         """Send a get request to the OBIS api's /occurrence endpoint
@@ -87,6 +110,7 @@ class ObisAPI():
         size = self.size
         url = f'https://api.obis.org/v3'
         scientificname = whales[whale]['scientificname']
+        startdate, enddate = self.is_dateformat((startdate, enddate))
         params = {'scientificname': scientificname, 'startdate': startdate, 'enddate': enddate, 'size': size}
         try:
             scientificname = whales[whale]['scientificname']
@@ -133,22 +157,26 @@ class ObisAPI():
             current_size = 0
             for rec in records:
                 current_size += rec['records']
+                # update the startdate only if it has been passed as a parameter in else block
+                startdate = str(rec['year']) if startdate == None else startdate
                 # set enddate to current record if the statement is True
                 if current_size <= max_size:
-                    print(f"current_size: {current_size}/{max_size}, {rec['year']}")
+                    logger.info(f"current_size: {current_size}/{max_size}, {rec['year']}")
                     enddate = str(rec['year'])
-                    enddate = enddate + '-12-31'
+                # if a single record exceeds max_size. Skip for now
+                elif rec['records'] > max_size:
+                    logger.info(f"Skipping {rec['records']}. Exceeds size")
+                    current_size = 0
+                    startdate = None
                 else:
-                    print(f"end: {enddate}, current size {current_size}/{max_size}, {rec['year']}")
+                    logger.info(f"end: {enddate}, current size {current_size}/{max_size}, {rec['year']}")
                     self.get_occurrences(startdate, enddate)
-                    current_size = rec['records']
-                    print(f"Resetting, current_size: {current_size}, {rec['year']}")
-                    endyear = parse(enddate).year
-                    startdate = str(endyear + 1)
-                    startdate = startdate + '-01-01'
-                    print(f'start: {startdate}')
-            # make final request when last record is reached
-            self.get_occurrences(startdate, enddate)
+                    current_size = 0
+                    logger.info(f"Resetting, current_size: {current_size}, {rec['year']}")
+                    startdate = None
+            # make final request when last record is reached with the farthest, unaltered enddate value
+            logger.info('Last record reached')
+            self.get_occurrences(startdate, self.enddate)
         # make a single request if size is not exceeded
         else:
             self.get_occurrences(startdate, enddate)
