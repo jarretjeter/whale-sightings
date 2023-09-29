@@ -6,7 +6,9 @@ from logging import INFO
 from pathlib import Path
 import re
 import requests
+from requests.adapters import HTTPAdapter, Retry
 import sys
+import time
 from typing import Optional
 
 logging.basicConfig(format='[%(asctime)s][%(module)s:%(lineno)04d] : %(message)s', level=INFO, stream=sys.stderr)
@@ -17,6 +19,10 @@ file = open(f"{root_dir}/config.json", 'r')
 config = json.loads(file.read())
 # Whales Dictionary
 whales = config['whales']
+
+session = requests.Session()
+retries = Retry(total=5, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 504])
+session.mount('https://', HTTPAdapter(max_retries=retries))
 
 
 class ObisAPI():
@@ -63,18 +69,20 @@ class ObisAPI():
             params['startdate'] = self.startdate
         if self.enddate:
             params['enddate'] = self.enddate
+
         try:
-            # if a start or end date were not supplied, default values(earliest and latest records) will be retrieved from the endpoint response
-            r = requests.get(f'{url}/statistics/years', params=params)
-            logger.info(r.url)
-            logger.info(f'/statistics/years status code: {r.status_code}')
+            r = session.get(f"{url}/statistics/years", params=params)
+            logger.info(f'Status code: {r.status_code}\n{r.url}')
+            r.raise_for_status()
             records = r.json()
+
+            # if a start or end date were not supplied, default values(earliest and latest records) will be retrieved from the endpoint response
             if not self.startdate:
-                self.startdate = str(records[0]['year']) + '-01-01'
+                self.startdate = str(records[0]['year'])
             if not self.enddate:
-                self.enddate = str(records[-1]['year']) + '-12-31'
+                self.enddate = str(records[-1]['year'])
             for rec in records:
-                num_records = num_records + rec['records']
+                num_records += rec['records']
             return records, num_records
         except requests.exceptions.RequestException as e:
             logger.info(e)
@@ -102,9 +110,14 @@ class ObisAPI():
         return start, end
 
 
-# ERROR HANDLE STATUS CODES
     def get_occurrences(self, startdate: str, enddate: str) -> None:
         """Send a get request to the OBIS api's /occurrence endpoint
+
+        Args:
+            startdate, enddate: str
+                start and end dates to query through
+        Returns:
+            None
         """
         whale = self.whale
         size = self.size
@@ -112,11 +125,12 @@ class ObisAPI():
         scientificname = whales[whale]['scientificname']
         startdate, enddate = self.is_dateformat((startdate, enddate))
         params = {'scientificname': scientificname, 'startdate': startdate, 'enddate': enddate, 'size': size}
+        
         try:
             scientificname = whales[whale]['scientificname']
-            r = requests.get(f"{url}/occurrence", params=params)
-            logger.info(r.url)
-            logger.info(f"/occurrence status code: {r.status_code}")
+            r = session.get(f"{url}/occurrence", params=params)
+            logger.info(f'Status code: {r.status_code}\n{r.url}')
+            r.raise_for_status()
             self.response = r
             self.save_json(startdate, enddate)
         except requests.exceptions.RequestException as e:
@@ -125,6 +139,12 @@ class ObisAPI():
 
     def save_json(self, startdate: str, enddate: str) -> None:
         """Save a `requests.Response` to a json file
+        
+        Args:
+            startdate, enddate: str
+                used for file naming
+        Returns:
+            None
         """
         whale = self.whale
         data_dir = self.data_dir
@@ -143,37 +163,43 @@ class ObisAPI():
         startdate = self.startdate
         enddate = self.enddate
         max_size = self.size
-        startyear = parse(startdate).year
-        endyear = parse(enddate).year
         records = self.records
         num_records = self.num_records
-        print(f'max: {max_size}')
         print(f'num_records: {num_records}')
-
-        # logic currently depends on if the size of the first record is less than the max size
 
         # if the total number of records exceeds the size attribute, a series of requests are made
         if max_size <= num_records:
             current_size = 0
+
             for rec in records:
                 current_size += rec['records']
-                # update the startdate only if it has been passed as a parameter in else block
+                # update the startdate only if it has been set to None in elif block
                 startdate = str(rec['year']) if startdate == None else startdate
-                # set enddate to current record if the statement is True
+
                 if current_size <= max_size:
                     logger.info(f"current_size: {current_size}/{max_size}, {rec['year']}")
                     enddate = str(rec['year'])
-                # if a single record exceeds max_size. Skip for now
+                # if a single year's records exceed max_size, save data in its own separate file
                 elif rec['records'] > max_size:
-                    logger.info(f"Skipping {rec['records']}. Exceeds size")
+                    logger.info(f"Records for {rec['year']} exceeds size {rec['records']}/{max_size}")
+                    # save previous years
+                    self.get_occurrences(startdate, enddate)
+                    time.sleep(1.0)
+                    # save exceeding year by itself
+                    self.get_occurrences(str(rec['year']), str(rec['year']))
+                    time.sleep(1.0)
                     current_size = 0
+                    logger.info(f"Resetting, current_size: 0, {rec['year']}")
+                    # do not set startdate to current record, set on next iteration
                     startdate = None
                 else:
                     logger.info(f"end: {enddate}, current size {current_size}/{max_size}, {rec['year']}")
                     self.get_occurrences(startdate, enddate)
-                    current_size = 0
-                    logger.info(f"Resetting, current_size: {current_size}, {rec['year']}")
-                    startdate = None
+                    time.sleep(1.0)
+                    current_size = rec['records']
+                    logger.info(f"Resetting, current_size: {rec['records']}, {rec['year']}")
+                    # After saving past records, set startdate to current record year
+                    startdate = str(rec['year'])
             # make final request when last record is reached with the farthest, unaltered enddate value
             logger.info('Last record reached')
             self.get_occurrences(startdate, self.enddate)
