@@ -8,6 +8,7 @@ import pandas as pd
 from pathlib import Path
 import re
 import sys
+from typing import Optional
 
 logging.basicConfig(format='[%(asctime)s][%(module)s:%(lineno)04d] : %(message)s', level=INFO, stream=sys.stderr)
 logger = logging.getLogger(__name__)
@@ -42,22 +43,20 @@ class WhaleDataManager():
     data_dir = './data'
 
 
-    def __init__(self, whale: str, start_date: str, end_date: str) -> None:
+    def __init__(self, whale: str, startdate: Optional[str]=None, enddate: Optional[str]=None) -> None:
         """
         Args:
             whale: str
                 Name for file paths and column values
-            start_date: str
-                Part of file path to search
-            end_date: str
+            startdate, enddate: str
                 Part of file path to search
         """
         if whale in whales:
             self.whale = whale
         else:
             raise ValueError(f'{whale} not in whales dictionary. {whales.keys()}')
-        self.start = start_date
-        self.end = end_date
+        self.start = startdate
+        self.end = enddate
 
 
     def match_files(self) -> list:
@@ -67,21 +66,50 @@ class WhaleDataManager():
         Returns:
             list[Path]
         """
-        start_year = parse(self.start).year
-        end_year = parse(self.end).year
         whale_dir = Path(f'{self.data_dir}/{self.whale}')
         files = list(whale_dir.glob('*.json'))
         matched = []
 
-        for file in files:
-            match = re.search(r'(\d{4})-\d{2}-\d{2}\--(\d{4})-\d{2}-\d{2}', file.name)
-            if match:
-                file_start_year = int(match.group(1))
-                file_end_year = int(match.group(2))
+        if self.start and self.end:
+            start_year = parse(self.start).year
+            end_year = parse(self.end).year
 
-                if start_year <= file_start_year <= end_year and start_year <= file_end_year <= end_year:
-                    matched.append(file)
-        return matched
+            for file in files:
+                match = re.search(r'(\d{4})-\d{2}-\d{2}\--(\d{4})-\d{2}-\d{2}', file.name)
+                if match:
+                    file_start_year = int(match.group(1))
+                    file_end_year = int(match.group(2))
+
+                    if start_year <= file_start_year <= end_year and start_year <= file_end_year <= end_year:
+                        matched.append(file)
+            return matched
+
+        elif self.start and not self.end:
+            start_year = parse(self.start).year
+
+            for file in files:
+                match = re.search(r'(\d{4})-\d{2}-\d{2}\--\d{4}-\d{2}-\d{2}', file.name)
+                if match:
+                    file_start_year = int(match.group(1))
+
+                    if start_year <= file_start_year:
+                        matched.append(file)
+            return matched
+        
+        elif not self.start and self.end:
+            end_year = parse(self.end).year
+
+            for file in files:
+                match = re.search(r'\d{4}-\d{2}-\d{2}\--(\d{4})-\d{2}-\d{2}', file.name)
+                if match:
+                    file_end_year = int(match.group(1))
+
+                    if file_end_year <= end_year:
+                        matched.append(file)
+            return matched
+        
+        else:
+            return files
 
 
     def filter_keys(self) -> list:
@@ -122,6 +150,7 @@ class WhaleDataManager():
         whale = self.whale
         whale = whale.replace('_', ' ').title()
         df['vernacularName'] = df['vernacularName'].fillna(whale)
+        df['individualCount'] = pd.to_numeric(df['individualCount'], errors='coerce')
         # If missing count, report at least 1 whale sighted
         df['individualCount'] = df['individualCount'].fillna(1)
         return df
@@ -188,9 +217,9 @@ class WhaleDataManager():
         df = df.reindex(columns=key_list)
         # Rows with matching event dates, latitude, and longitude are likely the same event
         df = df.drop_duplicates(subset=['eventDate', 'decimalLatitude', 'decimalLongitude'], keep='first')
-        self.fill_in(df)
+        df = self.fill_in(df)
         df['eventDate'] = df['eventDate'].apply(self.convert_dates)
-        self.get_ocean(df)
+        df = self.get_ocean(df)
         self.filename = f'{self.start}--{self.end}.csv'
         logger.info(f'Saving dataframe to {output_dir}/{self.filename}')
         df.to_csv(f"{output_dir}/{self.filename}", index=False)
