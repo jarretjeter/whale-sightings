@@ -69,6 +69,8 @@ class WhaleDataManager():
         """
         whale_dir = Path(f'{self.data_dir}/{self.whale}')
         files = list(whale_dir.glob('*.json'))
+        if not files:
+            raise FileNotFoundError(f'No files found in: {whale_dir}')
         matched = []
 
         if self.start and self.end:
@@ -83,7 +85,11 @@ class WhaleDataManager():
 
                     if start_year <= file_start_year <= end_year and start_year <= file_end_year <= end_year:
                         matched.append(file)
-            return matched
+            if matched:
+                return matched
+            else:
+                raise FileNotFoundError('No matching files found')
+
 
         elif self.start and not self.end:
             start_year = parse(self.start).year
@@ -95,8 +101,12 @@ class WhaleDataManager():
 
                     if start_year <= file_start_year:
                         matched.append(file)
-            return matched
+            if matched:
+                return matched
+            else:
+                raise FileNotFoundError('No matching files found')
         
+
         elif not self.start and self.end:
             end_year = parse(self.end).year
 
@@ -107,7 +117,10 @@ class WhaleDataManager():
 
                     if file_end_year <= end_year:
                         matched.append(file)
-            return matched
+            if matched:
+                return matched
+            else:
+                raise FileNotFoundError('No matching files found')
         
         else:
             return files
