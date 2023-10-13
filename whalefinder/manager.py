@@ -49,7 +49,8 @@ class WhaleDataManager():
             whale: str
                 Name for file paths and column values
             startdate, enddate: str
-                Part of file path to search
+                Used for filepath searching and csv writing.
+                If no specific arguments are supplied, a function call will get these values
         """
         if whale in whales:
             self.whale = whale
@@ -198,6 +199,42 @@ class WhaleDataManager():
         # Update waterBody names
         df['waterBody'] = joined_df['name']
         return df
+    
+
+    def get_earliest_and_latest(self, dates: pd.Series) -> None:
+        """
+        Acquire the earliest and latest dates in a `pandas.Series` and save to classes'
+        start and end attributes if they are None.
+
+        Args:
+            dates: pd.Series
+                contains date-like values
+        Returns:
+            None
+        """
+        dates_copy = dates.copy(deep=True)
+
+        if not self.start and not self.end:
+            for i, d in dates_copy.items():
+                if isinstance(d, int) or isinstance(d, str):
+                    dates_copy[i] = pd.to_datetime(d).date()
+
+            self.start = min(dates_copy)
+            self.end = max(dates_copy)
+
+        elif self.start and not self.end:
+            for i, d in dates_copy.items():
+                if isinstance(d, int) or isinstance(d, str):
+                    dates_copy[i] = pd.to_datetime(d).date()
+
+            self.end = max(dates_copy)
+        
+        elif self.end and not self.start:
+            for i, d in dates_copy.items():
+                if isinstance(d, int) or isinstance(d, str):
+                    dates_copy[i] = pd.to_datetime(d).date()
+
+            self.start = min(dates_copy)
 
 
     def create_dataframe(self) -> pd.DataFrame:
@@ -220,6 +257,7 @@ class WhaleDataManager():
         df = self.fill_in(df)
         df['eventDate'] = df['eventDate'].apply(self.convert_dates)
         df = self.get_ocean(df)
+        self.get_earliest_and_latest(df['eventDate'])
         self.filename = f'{self.start}--{self.end}.csv'
         logger.info(f'Saving dataframe to {output_dir}/{self.filename}')
         df.to_csv(f"{output_dir}/{self.filename}", index=False)
