@@ -129,8 +129,10 @@ def validate_response(whale: str, data: dict) -> Tuple["dict[str, list]", "dict[
             occurrence = Results(**item)
             validated['validated'].append(occurrence.model_dump(mode='json'))
         except ValidationError as e:
+            # remove extra keys from item
+            filtered_item = Results.model_construct(**item).model_dump(mode='json', warnings=False)
             invalid = e.errors(include_context=False, include_input=False, include_url=False)
-            invalid.append(item)
+            invalid[0]['data'] = filtered_item
             errors['errors'].append(invalid)
 
     logger.info(f"Validated: {len(validated['validated'])}, Errors: {len(errors['errors'])}")
@@ -138,13 +140,13 @@ def validate_response(whale: str, data: dict) -> Tuple["dict[str, list]", "dict[
     if validated['validated']:
         accepted_dir = Path(f"{data_dir}/{whale}/valid")
         accepted_dir.mkdir(parents=True, exist_ok=True)
-        with open(f"{accepted_dir}/valid_data.json", 'w') as file:
+        with open(f"{accepted_dir}/valid_data1.json", 'w') as file:
             json.dump(validated, file, indent=4, ensure_ascii=False)
             
     if errors['errors']:
         rejects_dir = Path(f"{data_dir}/{whale}/invalid")
         rejects_dir.mkdir(parents=True, exist_ok=True)
-        with open(f"{rejects_dir}/invalid_data.json", "w") as file:
+        with open(f"{rejects_dir}/invalid_data1.json", "w") as file:
             json.dump(errors, file, indent=4, ensure_ascii=False)
 
     return validated, errors
