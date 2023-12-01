@@ -1,156 +1,202 @@
-from datetime import date, datetime
+from datetime import date
 from dateutil.parser import parse
+import json
 import logging
 from logging import INFO
-import json
 from pathlib import Path
 from pydantic import BaseModel, ConfigDict, Field, field_validator, ValidationError
 import re
 import sys
-from typing import Any, List, Optional, Tuple, Union
+from typing import Optional, Tuple
 
 logging.basicConfig(format='[%(asctime)s][%(module)s:%(lineno)04d] : %(message)s', level=INFO, stream=sys.stderr)
 logger = logging.getLogger(__name__)
 
+root_dir = Path().cwd()
+file = open(f"{root_dir}/config.json", 'r')
+config = json.loads(file.read())
+whales = config['whales']
+
 
 class Results(BaseModel):
+    """
+    Pydantic model to validate Obis API responses against.
+    """
     model_config = ConfigDict(arbitrary_types_allowed=True, extra='ignore')
 
-    occurrenceID: str
+    occurrenceID: str = Field(default='')
     eventDate: date
-    verbatimEventDate: str = Field(default=None)
-    year: str = Field(default=None)
-    date_year: int = Field(default=None)
-    month: int = Field(default=None)
+    verbatimEventDate: str = Field(default='')
     decimalLatitude: float
     decimalLongitude: float
-    waterBody: str = Field(default=None)
+    waterBody: str = Field(default='')
     species: str
     speciesid: int
-    vernacularName: str = Field(default=None)
+    vernacularName: str = Field(default='')
     individualCount: int = Field(default=1)
-    basisOfRecord: str = Field(default=None)
-    bibliographicCitation: str = Field(default=None)
+    basisOfRecord: str = Field(default='')
+    bibliographicCitation: str = Field(default='')
 
 
     @field_validator('eventDate', mode='before')
     @classmethod
     def check_eventDate(cls, value) -> date:
         """
-        Check if an eventDate field's value is of an acceptable format.
+        accepted format examples: 
+        '1913-03-17', '1849-12-04 23:12:00', '1849-12-04T23:12:00', 
+        '1849-12-04T23:12:00Z', '1971-01-01 00:00:00+00', '1910-12-24T02:00'
 
-        Accepted format examples:\n
-        ('1913-03-17', '1849-12-04 23:12:00', '1849-12-04T23:12:00', '1849-12-04T23:12:00Z', '1971-01-01 00:00:00+00')
-
-        Unaccepted format examples:\n
-        (1758, '1785/1913', '1800-01-01/1874-06-24', '23 Aug 1951', 'Oct 1949', '1925-11')
+        unaccepted format examples: 
+        1758, '1785/1913', '1800-01-01/1874-06-24', '23 Aug 1951', 'Oct 1949', '1925-11', etc.
         """
         date_formats = [
             r'^\d{4}-\d{2}-\d{2}$', 
             r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$',
+            r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}Z$',
             r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\+\d{2}$',
+            r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$',
+            r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}\+\d{2}$',
             r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$',
-            r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$'
+            r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$',
+            r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+\d{2}:\d{2}$',
             ]
-        match_found = False
-
+        
+        # If split dates are the same, except the timestamp (e.g. '2014-04-28T09:42:00/2014-04-28T10:50:00')
+        if '/' in value and '-' in value:
+            start_date, end_date = value.split('/')
+            time_format = re.compile(r'T.*')
+            start_date = re.sub(time_format, '', start_date)
+            end_date = re.sub(time_format, '', end_date)
+            if start_date == end_date:
+                value = start_date
         for fmt in date_formats:
             if re.match(fmt, value):
-                match_found = True
-                break
-            
-        if match_found:
-            return parse(value).date()
+                return parse(value).date()
         else:
-            raise ValueError('eventDate does not match any accepted format.')
+            raise ValueError(f"eventDate '{value}' does not match any accepted format.")
 
 
-data = {
-    "total": 4157,
-    "results": [
-        {
-            "basisOfRecord": "MachineObservation",
-            "decimalLatitude": 71.412,
-            "decimalLongitude": -152.006,
-            "eventDate": "1932-10-13",
-            "eventTime": "21:00:00Z",
-            "footprintWKT": "POINT(-152.006 71.412)",
-            "geodeticDatum": "EPSG:4326 WGS84",
-            "occurrenceID": "914_2730",
-            # "individualCount": "NA",
-            "scientificName": "Delphinapterus leucas",
-            "verbatimEventDate": "2010-10-01 13:00:00",
-            "vernacularName": "Beluga",
-            "waterBody": "Beaufort Sea",
-            "species": "Delphinapterus leucas",
-            "speciesid": 137115,
-        },
-        {
-            "basisOfRecord": "HumanObservation",
-            "decimalLatitude": 69.040001,
-            "decimalLongitude": -137.603302,
-            "eventDate": "1758-07-02T12:00:00Z",
-            "eventTime": "22:05:00Z",
-            "footprintWKT": "POINT(-137.603302 69.040001)",
-            "geodeticDatum": "EPSG:4326 WGS84",
-            # "occurrenceID": "825_23151",
-            "individualCount": "1",
-            "scientificName": "Delphinapterus leucas",
-            "verbatimEventDate": "1980-07-21 14:05:00",
-            "vernacularName": "Beluga",
-            "waterBody": "Arctic,Beaufort Sea,Chukchi Sea,Bering Sea",
-            "species": "Delphinapterus leucas",
-            "speciesid": 137115,
-        }
-    ]
-}
-
-
-def validate_response(whale: str, data: dict) -> Tuple["dict[str, list]", "dict[str, list]"]:
+class Validator():
     """
-    Validate data from API response
-
-    Args:
-        whale: str
-            directory of whale to save to
-        data: list[dict]
-            data to validate against a Pydantic model
-    Returns:
-        Tuple[dict[str, list], dict[str, list]]
-            Tuple values of accepted data and rejected data
+    Class for retrieving files and running Pydantic model
     """
-    validated = {'validated': []}
-    errors = {'errors': []}
-
     data_dir = './data'
+
+
+    def __init__(self, whale: str, startdate: Optional[str]=None, enddate: Optional[str]=None) -> None:
+        """
+        
+        """
+        if whale in whales:
+            self.whale = whale
+        else:
+            raise ValueError(f'{whale} not in whales dictionary. {whales.keys()}')
+        self.startdate = startdate
+        self.enddate = enddate
+
+
+    def match_files(self) -> list:
+        """
+        Get json files that match the class instance's start and end date attributes
+
+        Returns:
+            list[Path]
+        """
+        whale_dir = Path(f'{self.data_dir}/{self.whale}')
+        reg_pattern = r'\d{4}-\d{2}-\d{2}\--\d{4}-\d{2}-\d{2}'
+        files = []
+        matched_files = []
+        for file in whale_dir.glob('*.json'):
+            if re.search(reg_pattern, file.name):
+                files.append(file)
+
+        if matched_files:
+            if self.start and self.end:
+                start_year = parse(self.start).year
+                end_year = parse(self.end).year
+
+                for file in files:
+                    match = re.search(r'(\d{4})-\d{2}-\d{2}\--(\d{4})-\d{2}-\d{2}', file.name)
+                    if match:
+                        file_start_year = int(match.group(1))
+                        file_end_year = int(match.group(2))
+
+                        if start_year <= file_start_year <= end_year and start_year <= file_end_year <= end_year:
+                            matched_files.append(file)
+
+            elif self.start and not self.end:
+                start_year = parse(self.start).year
+
+                for file in files:
+                    match = re.search(r'(\d{4})-\d{2}-\d{2}\--\d{4}-\d{2}-\d{2}', file.name)
+                    if match:
+                        file_start_year = int(match.group(1))
+
+                        if start_year <= file_start_year:
+                            matched_files.append(file)
+
+            elif not self.start and self.end:
+                end_year = parse(self.end).year
+
+                for file in files:
+                    match = re.search(r'\d{4}-\d{2}-\d{2}\--(\d{4})-\d{2}-\d{2}', file.name)
+                    if match:
+                        file_end_year = int(match.group(1))
+
+                        if file_end_year <= end_year:
+                            matched_files.append(file)
+
+            return matched_files
+        else:
+            return files
     
-    for item in data['results']:
-        try:
-            occurrence = Results(**item)
-            validated['validated'].append(occurrence.model_dump(mode='json'))
-        except ValidationError as e:
-            # remove extra keys from item
-            filtered_item = Results.model_construct(**item).model_dump(mode='json', warnings=False)
-            invalid = e.errors(include_context=False, include_input=False, include_url=False)
-            invalid[0]['data'] = filtered_item
-            errors['errors'].append(invalid)
 
-    logger.info(f"Validated: {len(validated['validated'])}, Errors: {len(errors['errors'])}")
+    def get_data(self) -> dict:
+        """
+        Load data from multiple files into a single dictionary
 
-    if validated['validated']:
-        accepted_dir = Path(f"{data_dir}/{whale}/valid")
-        accepted_dir.mkdir(parents=True, exist_ok=True)
-        with open(f"{accepted_dir}/valid_data1.json", 'w') as file:
-            json.dump(validated, file, indent=4, ensure_ascii=False)
-            
-    if errors['errors']:
-        rejects_dir = Path(f"{data_dir}/{whale}/invalid")
-        rejects_dir.mkdir(parents=True, exist_ok=True)
-        with open(f"{rejects_dir}/invalid_data1.json", "w") as file:
-            json.dump(errors, file, indent=4, ensure_ascii=False)
+        Returns:
+            dict
+        """
+        files = self.match_files()
+        data = {'results': []}
 
-    return validated, errors
+        for file in files:
+            with open(file) as f:
+                results = json.load(f)
+                if 'results' in results.keys():
+                    for d in results['results']:
+                        data['results'].append(d)
 
+        return data
+    
 
-if __name__ == '__main__':
-    validate_response(whale='test_whale', data=data)
+    def validate_response(self) -> Tuple[dict, dict]:
+        """
+        Validate data from API response
+
+        Returns:
+            Tuple containing a dict of valid data and a dict of error data
+        """
+        valid_data = {'validated': []}
+        error_data = {'errors': []}
+        num_errors = 0
+        data = self.get_data()
+
+        for item in data['results']:
+            try:
+                occurrence = Results(**item)
+                valid_data['validated'].append(occurrence.model_dump(mode='json'))
+            except ValidationError as e:
+                error_details = e.errors(include_context=False, include_input=False, include_url=False)
+                # extract detail location from tuple
+                for detail in error_details:
+                    detail['loc'] = detail['loc'][0]
+                # remove extra keys from item
+                filtered_item = Results.model_construct(**item).model_dump(mode='json', warnings=False)
+                error_data['errors'].append({'details': error_details, 'data': filtered_item})
+                num_errors += len(error_details)
+
+        logger.info(f"Validated: {len(valid_data['validated'])}, Errors: {num_errors}")
+
+        return valid_data, error_data
