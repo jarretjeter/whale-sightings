@@ -1,19 +1,26 @@
-import datetime as dt
-from whalefinder import obis, manager
 from storage import *
+import typer
+from typing import Optional
+from whalefinder import cleaner, obis, validate
+
+pipeline = typer.Typer()
 
 
-
-def main():
-    now = str(dt.datetime.now().date())
-    obis_api = obis.ObisAPI('blue_whale', '1758-01-01', now)
+@pipeline.command('run')
+def run(whale: str, startdate: Optional[str]=None, enddate: Optional[str]=None):
+    """
+    Pipeline orchestration
+    """
+    obis_api = obis.ObisAPI(whale, startdate, enddate)
     obis_api.api_requests()
-    wdm = manager.WhaleDataManager('blue_whale', '1758-01-01', now)
-    wdm.create_dataframe()
-    to_mysql(wdm.whale, wdm.filename)
+    validator = validate.Validator(whale, startdate, enddate)
+    valid_data, error_data = validator.validate_response()
+    datacleaner = cleaner.WhaleDataCleaner(whale, valid_data, error_data, startdate, enddate)
+    datacleaner.process_and_save()
+    to_mysql(whale, datacleaner.filename)
 
 
 if __name__ == '__main__':
     print('Running pipeline')
-    main()
+    pipeline()
     print('Pipeline finished')

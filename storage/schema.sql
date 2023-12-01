@@ -38,12 +38,19 @@ DROP TABLE IF EXISTS `occurrences`;
 /*!50503 SET character_set_client = utf8mb4 */;
 CREATE TABLE `occurrences` (
   `id` varchar(150) NOT NULL,
-  `eventDate` date NOT NULL,
+  `eventDate` varchar(50) NOT NULL,
   `waterBodyId` int DEFAULT NULL,
   `latitude` decimal(9,7) NOT NULL,
   `longitude` decimal(10,7) NOT NULL,
   `speciesId` int DEFAULT NULL,
   `individualCount` int NOT NULL,
+  `start_year` int NOT NULL,
+  `start_month` int NOT NULL,
+  `start_day` int NOT NULL,
+  `end_year` int NOT NULL,
+  `end_month` int NOT NULL,
+  `end_day` int NOT NULL,
+  `date_is_valid` BOOLEAN NOT NULL,
   PRIMARY KEY (`id`),
   CONSTRAINT `fk_waterBodyId`
   FOREIGN KEY (`waterBodyId`)
