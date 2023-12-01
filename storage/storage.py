@@ -42,24 +42,21 @@ def insert_occurrences(row, waterBodyId, cursor: pymysql.cursors.DictCursor) -> 
         None
     """
     # If eventDate is not in the format of `YYYY`
-    if len(str(row.eventDate)) != 4:
-        sql = """INSERT INTO `occurrences` 
-                    (`id`, `eventDate`, `waterBodyId`, `latitude`, `longitude`, `speciesId`, `individualCount`)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    ON DUPLICATE KEY
-                    UPDATE eventDate=VALUES(eventDate), latitude=VALUES(latitude), longitude=VALUES(longitude), individualCount=VALUES(individualCount)"""
-        cursor.execute(sql, (row.occurrenceID, row.eventDate, waterBodyId, row.decimalLatitude, row.decimalLongitude, row.speciesid, row.individualCount))
-
-    # If in `YYYY` format, default to -00-00 for `mm-dd` values
-    else:
-        eventDate = row.eventDate
-        eventDate = eventDate + "-00-00"
-        sql = """INSERT INTO `occurrences` 
-                    (`id`, `eventDate`, `waterBodyId`, `latitude`, `longitude`, `speciesId`, `individualCount`)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    ON DUPLICATE KEY
-                    UPDATE eventDate=VALUES(eventDate), latitude=VALUES(latitude), longitude=VALUES(longitude), individualCount=VALUES(individualCount)"""
-        cursor.execute(sql, (row.occurrenceID, eventDate, waterBodyId, row.decimalLatitude, row.decimalLongitude, row.speciesid, row.individualCount))
+    # if len(str(row.eventDate)) != 4:
+    sql = """INSERT INTO `occurrences` 
+                (`id`, `eventDate`, `waterBodyId`, `latitude`, `longitude`, `speciesId`, `individualCount`,
+                `start_year`, `start_month`, `start_day`, `end_year`, `end_month`, `end_day`, `date_is_valid`)
+                VALUES 
+                (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON DUPLICATE KEY
+                UPDATE 
+                eventDate=VALUES(eventDate), latitude=VALUES(latitude), longitude=VALUES(longitude), individualCount=VALUES(individualCount), 
+                start_year=VALUES(start_year), start_month=VALUES(start_month), start_day=VALUES(start_day), end_year=VALUES(end_year), end_month=VALUES(end_month),
+                end_day=VALUES(end_day), date_is_valid=VALUES(date_is_valid)"""
+    cursor.execute(sql, (
+        row.occurrenceID, row.eventDate, waterBodyId, row.decimalLatitude, row.decimalLongitude, row.speciesid, row.individualCount, 
+        row.start_year, row.start_month, row.start_day, row.end_year, row.end_month, row.end_day, row.date_is_valid
+        ))
 
 
 def insert_species(row, cursor: pymysql.cursors.DictCursor) -> None:
