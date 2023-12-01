@@ -1,5 +1,3 @@
-from dateutil.parser import parse
-import datetime
 import json
 import logging
 from logging import INFO
@@ -9,7 +7,7 @@ import requests
 from requests.adapters import HTTPAdapter, Retry
 import sys
 import time
-from typing import Optional
+from typing import Dict, List, Optional, Tuple
 
 logging.basicConfig(format='[%(asctime)s][%(module)s:%(lineno)04d] : %(message)s', level=INFO, stream=sys.stderr)
 logger = logging.getLogger(__name__)
@@ -27,7 +25,6 @@ session.mount('https://', HTTPAdapter(max_retries=retries))
 
 class ObisAPI():
     """Object for obtaining whale data from specific OBIS api endpoints (https://api.obis.org/v3)
-    
     (https://obis.org/)
     """
     data_dir = './data'
@@ -54,7 +51,7 @@ class ObisAPI():
         self.records, self.num_records = self.get_records()
         
 
-    def get_records(self) -> tuple:
+    def get_records(self) -> Tuple[List[Dict], int]:
         """Retrieve total number of records from a request to the /statistics/years endpoint
 
         Returns:
@@ -99,15 +96,18 @@ class ObisAPI():
         """
         start = date_strings[0]
         end = date_strings[1]
-        if re.match(r"\d{4}-\d{2}-\d{2}", start):
-            pass
-        else:
-            start = str(start) + '-01-01'
-        if re.match(r"\d{4}-\d{2}-\d{2}", end):
-            pass
-        else:
-            end = str(end) + '-12-31'
-        return start, end
+        try:
+            if re.match(r"\d{4}-\d{2}-\d{2}", start):
+                pass
+            else:
+                start = str(start) + '-01-01'
+            if re.match(r"\d{4}-\d{2}-\d{2}", end):
+                pass
+            else:
+                end = str(end) + '-12-31'
+            return start, end
+        except TypeError as e:
+            logger.info(f"{e} \n {date_strings}, type: {type(date_strings[0]), type(date_strings[1])}")
 
 
     def get_occurrences(self, startdate: str, enddate: str) -> None:
@@ -171,12 +171,16 @@ class ObisAPI():
         if max_size <= num_records:
             current_size = 0
 
-            for rec in records:
+            for i, rec in enumerate(records):
                 current_size += rec['records']
                 # update the startdate only if it has been set to None in elif block
                 startdate = str(rec['year']) if startdate == None else startdate
+                enddate = str(rec['year']) if enddate == None else enddate
 
-                if current_size <= max_size:
+                if len(records) -1 == i:
+                    logger.info('Last record reached')
+                    self.get_occurrences(startdate, self.enddate)
+                elif current_size <= max_size:
                     logger.info(f"current_size: {current_size}/{max_size}, {rec['year']}")
                     enddate = str(rec['year'])
                 # if a single year's records exceed max_size, save data in its own separate file
@@ -190,8 +194,9 @@ class ObisAPI():
                     time.sleep(1.0)
                     current_size = 0
                     logger.info(f"Resetting, current_size: 0, {rec['year']}")
-                    # do not set startdate to current record, set on next iteration
+                    # do not set start/enddate to current record, set on next iteration
                     startdate = None
+                    enddate = None
                 else:
                     logger.info(f"end: {enddate}, current size {current_size}/{max_size}, {rec['year']}")
                     self.get_occurrences(startdate, enddate)
@@ -200,9 +205,7 @@ class ObisAPI():
                     logger.info(f"Resetting, current_size: {rec['records']}, {rec['year']}")
                     # After saving past records, set startdate to current record year
                     startdate = str(rec['year'])
-            # make final request when last record is reached with the farthest, unaltered enddate value
-            logger.info('Last record reached')
-            self.get_occurrences(startdate, self.enddate)
+                    enddate = str(rec['year'])
         # make a single request if size is not exceeded
         else:
             self.get_occurrences(startdate, enddate)
