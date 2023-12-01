@@ -1,14 +1,11 @@
 # Directories
 __pycache__
 data/
+notebooks/
+notes/
 venv/
 
 
 # Files
 *.ipynb
 config.json
-notes.txt
-overview.txt
-processing.ipynb
-rel_data.md
-storage/config.json
