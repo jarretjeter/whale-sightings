@@ -15,9 +15,9 @@ def run(whale: str, startdate: Optional[str]=None, enddate: Optional[str]=None):
     obis_api.api_requests()
     validator = validate.Validator(whale, startdate, enddate)
     valid_data, error_data = validator.validate_response()
-    wdm = cleaner.WhaleDataCleaner(whale, valid_data, error_data, startdate, enddate)
-    wdm.process_and_save()
-    to_mysql(whale, wdm.filename)
+    datacleaner = cleaner.WhaleDataCleaner(whale, valid_data, error_data, startdate, enddate)
+    datacleaner.process_and_save()
+    to_mysql(whale, datacleaner.filename)
 
 
 if __name__ == '__main__':
