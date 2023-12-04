@@ -24,18 +24,18 @@ class Results(BaseModel):
     """
     model_config = ConfigDict(arbitrary_types_allowed=True, extra='ignore')
 
-    occurrenceID: str = Field(default='')
+    occurrenceID: str = Field(default=None)
     eventDate: date
-    verbatimEventDate: str = Field(default='')
+    verbatimEventDate: str = Field(default=None)
     decimalLatitude: float
     decimalLongitude: float
-    waterBody: str = Field(default='')
+    waterBody: str = Field(default=None)
     species: str
     speciesid: int
-    vernacularName: str = Field(default='')
+    vernacularName: str = Field(default=None)
     individualCount: int = Field(default=1)
-    basisOfRecord: str = Field(default='')
-    bibliographicCitation: str = Field(default='')
+    basisOfRecord: str = Field(default=None)
+    bibliographicCitation: str = Field(default=None)
 
 
     @field_validator('eventDate', mode='before')
