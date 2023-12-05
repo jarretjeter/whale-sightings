@@ -123,7 +123,6 @@ class Validator():
 
                         if start_year <= file_start_year <= end_year and start_year <= file_end_year <= end_year:
                             matched_files.append(file)
-                print(matched_files)
 
             elif self.startdate and not self.enddate:
                 start_year = parse(self.startdate).year
@@ -147,9 +146,10 @@ class Validator():
                         if file_end_year <= end_year:
                             matched_files.append(file)
 
+            else:
+                return files
+            
             return matched_files
-        else:
-            return files
     
 
     def get_data(self) -> dict:

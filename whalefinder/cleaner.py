@@ -306,25 +306,29 @@ class WhaleDataCleaner():
         Returns:
             pd.DataFrame
         """
-        num_errors = len(error_df)
-        error_df[['start_year', 'start_month', 'start_day', 'end_year', 'end_month', 'end_day']] = error_df['eventDate'].apply(lambda x: pd.Series(self.parse_dates(x)))
-        error_df['processed'] = (error_df[['start_year', 'start_month', 'start_day', 'end_year', 'end_month', 'end_day']] != 0).all(axis=1)
-        
-        # Differentiate rows that were successfully processed
-        processed_df = error_df[error_df['processed']].copy()
-        processed_df.reset_index(drop=True, inplace=True)
-        processed_df.drop(columns=['detail_type', 'detail_loc', 'detail_msg', 'processed'], inplace=True)
-        processed_df.drop_duplicates(inplace=True)
-
-        # save errors that failed to process
-        error_df = error_df[error_df['processed'] == False]
-        remaining_errors = len(error_df)
-        logger.info(f"{num_errors - remaining_errors}/{num_errors} errors processed")
         if not error_df.empty:
-            self.error_df_to_json(error_df)
+            num_errors = len(error_df)
+            error_df[['start_year', 'start_month', 'start_day', 'end_year', 'end_month', 'end_day']] = error_df['eventDate'].apply(lambda x: pd.Series(self.parse_dates(x)))
+            error_df['processed'] = (error_df[['start_year', 'start_month', 'start_day', 'end_year', 'end_month', 'end_day']] != 0).all(axis=1)
+            
+            # Differentiate rows that were successfully processed
+            processed_df = error_df[error_df['processed']].copy()
+            processed_df.reset_index(drop=True, inplace=True)
+            processed_df.drop(columns=['detail_type', 'detail_loc', 'detail_msg', 'processed'], inplace=True)
+            processed_df.drop_duplicates(inplace=True)
 
-        return processed_df
-    
+            # save errors that failed to process
+            error_df = error_df[error_df['processed'] == False]
+            remaining_errors = len(error_df)
+            logger.info(f"{num_errors - remaining_errors}/{num_errors} errors processed")
+            if not error_df.empty:
+                self.error_df_to_json(error_df)
+
+            return processed_df
+        
+        else:
+            return error_df
+        
 
     def process_valid_data(self) -> pd.DataFrame:
         """
@@ -383,7 +387,8 @@ class WhaleDataCleaner():
             return processed_errors_df
         
         else:
-            raise ValueError("Arguments contain no data to read.")
+            logger.info("No data to read.")
+            sys.exit()
 
 
     def process_and_save(self) -> pd.DataFrame:
