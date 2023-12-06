@@ -110,10 +110,10 @@ class Validator():
             if re.search(reg_pattern, file.name):
                 files.append(file)
 
-        if matched_files:
-            if self.start and self.end:
-                start_year = parse(self.start).year
-                end_year = parse(self.end).year
+        if files:
+            if self.startdate and self.enddate:
+                start_year = parse(self.startdate).year
+                end_year = parse(self.enddate).year
 
                 for file in files:
                     match = re.search(r'(\d{4})-\d{2}-\d{2}\--(\d{4})-\d{2}-\d{2}', file.name)
@@ -124,8 +124,8 @@ class Validator():
                         if start_year <= file_start_year <= end_year and start_year <= file_end_year <= end_year:
                             matched_files.append(file)
 
-            elif self.start and not self.end:
-                start_year = parse(self.start).year
+            elif self.startdate and not self.enddate:
+                start_year = parse(self.startdate).year
 
                 for file in files:
                     match = re.search(r'(\d{4})-\d{2}-\d{2}\--\d{4}-\d{2}-\d{2}', file.name)
@@ -135,8 +135,8 @@ class Validator():
                         if start_year <= file_start_year:
                             matched_files.append(file)
 
-            elif not self.start and self.end:
-                end_year = parse(self.end).year
+            elif not self.startdate and self.enddate:
+                end_year = parse(self.enddate).year
 
                 for file in files:
                     match = re.search(r'\d{4}-\d{2}-\d{2}\--(\d{4})-\d{2}-\d{2}', file.name)
@@ -146,9 +146,10 @@ class Validator():
                         if file_end_year <= end_year:
                             matched_files.append(file)
 
+            else:
+                return files
+            
             return matched_files
-        else:
-            return files
     
 
     def get_data(self) -> dict:
