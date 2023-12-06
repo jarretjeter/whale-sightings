@@ -13,8 +13,8 @@ logging.basicConfig(format='[%(asctime)s][%(module)s:%(lineno)04d] : %(message)s
 logger = logging.getLogger(__name__)
 
 root_dir = Path().cwd()
-file = open(f"{root_dir}/config.json", 'r')
-config = json.loads(file.read())
+with open(f"{root_dir}/config.json", 'r') as file:
+    config = json.load(file)
 # Whales Dictionary
 whales = config['whales']
 
@@ -48,7 +48,6 @@ class ObisAPI():
         self.startdate = startdate
         self.enddate = enddate
         self.size = size
-        self.records, self.num_records = self.get_records()
         
 
     def get_records(self) -> Tuple[List[Dict], int]:
@@ -160,11 +159,11 @@ class ObisAPI():
     def api_requests(self) -> None:
         """Send multiple requests to OBIS api depending on total records
         of response and size limit"""
+        records, num_records = self.get_records()
         startdate = self.startdate
         enddate = self.enddate
         max_size = self.size
-        records = self.records
-        num_records = self.num_records
+
         print(f'num_records: {num_records}')
 
         # if the total number of records exceeds the size attribute, a series of requests are made
