@@ -12,8 +12,8 @@ from typing import Dict, List, Optional, Tuple
 logging.basicConfig(format='[%(asctime)s][%(module)s:%(lineno)04d] : %(message)s', level=INFO, stream=sys.stderr)
 logger = logging.getLogger(__name__)
 
-root_dir = Path().cwd()
-with open(f"{root_dir}/config.json", 'r') as file:
+ROOT_DIR = Path().cwd()
+with open(f"{ROOT_DIR}/config.json", 'r') as file:
     config = json.load(file)
 # Whales Dictionary
 whales = config['whales']
@@ -23,24 +23,54 @@ retries = Retry(total=5, backoff_factor=1, status_forcelist=[429, 500, 502, 503,
 session.mount('https://', HTTPAdapter(max_retries=retries))
 
 
-class ObisAPI():
-    """Object for obtaining whale data from specific OBIS api endpoints (https://api.obis.org/v3)
-    (https://obis.org/)
+class ApiClient():
+    """
+    Client for the Obis API
+    """
+    base_url = "https://api.obis.org/v3"
+
+    def __init__(self) -> None:
+        pass
+
+    def request_api(self, endpoint: str, params: dict) -> requests.Response:
+        """
+        Send a get request to the api
+        Args:
+            endpoint: str
+                API endpoint to request
+            params: dict
+                parameters to send with request
+        Returns:
+            requests.Response
+        """
+        try:
+            response = session.get(f"{self.base_url}/{endpoint}", params=params)
+            response.raise_for_status()
+            return response
+        except requests.RequestException:
+            sys.exit("Failed to connect to the API")
+        
+
+class ObisHandler():
+    """Object for handling whale data from specific OBIS api endpoints
     """
     data_dir = './data'
 
-    def __init__(self, whale: str, startdate: Optional[str]=None, enddate: Optional[str]=None, size: Optional[int]=10000) -> None:
+    def __init__(self, api: ApiClient, whale: str, startdate: str='', enddate: str='', size: int=10000) -> None:
         """
         Args:
+            api: ApiClient
+                Object to make calls to the OBIS API
             whale: str
                 Whale for the api to query
-            startdate, enddate: str, default None
-                start and end dates to query through, in the format of `YYYY-MM-DD`.
-                If either are None, the earliest or latest records are retrieved.
+            startdate, enddate: str
+                start and end dates to query through, in `YYYY-MM-DD` format.
+                If values are empty, the earliest/latest records are retrieved.
             size: int, default 10,000
                 Maximum number of allowed results returned in json response
                 The API does not accept a size limit greater than 10,000
         """
+        self.api = api
         if whale in whales:
             self.whale = whale
         else:
@@ -56,36 +86,25 @@ class ObisAPI():
         Returns:
             tuple[list[dict], int]
         """
-        whale = self.whale
-        num_records = 0
-        url = f'https://api.obis.org/v3'
-        scientificname = whales[whale]['scientificname']
-        params = {'scientificname': scientificname}
-        if self.startdate:
-            params['startdate'] = self.startdate
-        if self.enddate:
-            params['enddate'] = self.enddate
+        endpoint = '/statistics/years'
+        scientificname = whales[self.whale]['scientificname']
+        params = {'scientificname': scientificname, 'startdate': self.startdate, 'enddate': self.enddate}
 
-        try:
-            r = session.get(f"{url}/statistics/years", params=params)
-            logger.info(f'Status code: {r.status_code}\n{r.url}')
-            r.raise_for_status()
-            records = r.json()
+        records = self.api.request_api(endpoint, params)
+        records = records.json()
 
-            # if a start or end date were not supplied, default values(earliest and latest records) will be retrieved from the endpoint response
-            if not self.startdate:
-                self.startdate = str(records[0]['year'])
-            if not self.enddate:
-                self.enddate = str(records[-1]['year'])
-            for rec in records:
-                num_records += rec['records']
-            return records, num_records
-        except requests.exceptions.RequestException as e:
-            logger.info(e)
+        # if start or end date are empty, default values(earliest and latest records) will be retrieved from response
+        if not self.startdate:
+            self.startdate = str(records[0]['year'])
+        if not self.enddate:
+            self.enddate = str(records[-1]['year'])
 
+        num_records = len(records)
+        return records, num_records
+        
 
-    def is_dateformat(self, date_strings: tuple) -> tuple:
-        """Checks for date formats (YYYY-mm-dd)
+    def is_dateformat(self, date_strings: tuple) -> Tuple[str, str]:
+        """Checks for date formats (YYYY-MM-DD)
         
         Args:
             date_strings: tuple[str, str]
@@ -93,20 +112,17 @@ class ObisAPI():
         Returns:
             tuple of converted strings
         """
-        start = date_strings[0]
-        end = date_strings[1]
-        try:
-            if re.match(r"\d{4}-\d{2}-\d{2}", start):
-                pass
-            else:
-                start = str(start) + '-01-01'
-            if re.match(r"\d{4}-\d{2}-\d{2}", end):
-                pass
-            else:
-                end = str(end) + '-12-31'
-            return start, end
-        except TypeError as e:
-            logger.info(f"{e} \n {date_strings}, type: {type(date_strings[0]), type(date_strings[1])}")
+        start = str(date_strings[0])
+        end = str(date_strings[1])
+        if re.match(r"\d{4}-\d{2}-\d{2}", start):
+            pass
+        else:
+            start = start + '-01-01'
+        if re.match(r"\d{4}-\d{2}-\d{2}", end):
+            pass
+        else:
+            end = end + '-12-31'
+        return start, end
 
 
     def get_occurrences(self, startdate: str, enddate: str) -> None:
@@ -118,37 +134,26 @@ class ObisAPI():
         Returns:
             None
         """
-        whale = self.whale
-        size = self.size
-        url = f'https://api.obis.org/v3'
-        scientificname = whales[whale]['scientificname']
+        endpoint = '/occurrence'
+        scientificname = whales[self.whale]['scientificname']
         startdate, enddate = self.is_dateformat((startdate, enddate))
-        params = {'scientificname': scientificname, 'startdate': startdate, 'enddate': enddate, 'size': size}
+        params = {'scientificname': scientificname, 'startdate': startdate, 'enddate': enddate, 'size': self.size}
         
-        try:
-            scientificname = whales[whale]['scientificname']
-            r = session.get(f"{url}/occurrence", params=params)
-            logger.info(f'Status code: {r.status_code}\n{r.url}')
-            r.raise_for_status()
-            self.response = r
-            self.save_json(startdate, enddate)
-        except requests.exceptions.RequestException as e:
-            logger.info(e)
+        response = self.api.request_api(endpoint, params)
+        self.save_json(response, startdate, enddate)
 
 
-    def save_json(self, startdate: str, enddate: str) -> None:
+    def save_json(self, response: requests.Response, startdate: str, enddate: str) -> None:
         """Save a `requests.Response` to a json file
         
         Args:
+            response: requests.Response
             startdate, enddate: str
                 used for file naming
         Returns:
             None
         """
-        whale = self.whale
-        data_dir = self.data_dir
-        response = self.response
-        output_dir = Path(f'{data_dir}/{whale}')
+        output_dir = Path(f'{self.data_dir}/{self.whale}')
         output_dir.mkdir(parents=True, exist_ok=True)
 
         with open(f'{output_dir}/{startdate}--{enddate}.json', 'w') as file:
