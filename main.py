@@ -11,8 +11,8 @@ def main(whale: str, startdate: str='', enddate: str=''):
     Pipeline orchestration
     """
     api = obis.ApiClient()
-    obis_api = obis.ObisHandler(api, whale, startdate, enddate)
-    obis_api.api_requests()
+    handler = obis.ObisHandler(api, whale, startdate, enddate)
+    handler.api_requests()
     validator = validate.Validator(whale, startdate, enddate)
     valid_data, error_data = validator.validate_response()
     datacleaner = cleaner.WhaleDataCleaner(whale, valid_data, error_data, startdate, enddate)
