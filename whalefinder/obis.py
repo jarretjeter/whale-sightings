@@ -45,7 +45,7 @@ class ApiClient():
         """
         try:
             response = session.get(f"{self.base_url}/{endpoint}", params=params)
-            response.raise_for_status()
+            time.sleep(1.0)
             return response
         except requests.RequestException:
             sys.exit("Failed to connect to the API")
@@ -90,21 +90,25 @@ class ObisHandler():
         scientificname = whales[self.whale]['scientificname']
         params = {'scientificname': scientificname, 'startdate': self.startdate, 'enddate': self.enddate}
 
+        logger.info(f"Getting records for {self.whale}")
         records = self.api.request_api(endpoint, params)
         records = records.json()
 
-        # if start or end date are empty, default values(earliest and latest records) will be retrieved from response
-        if not self.startdate:
-            self.startdate = str(records[0]['year'])
-        if not self.enddate:
-            self.enddate = str(records[-1]['year'])
+        for record in records: record['year'] = str(record['year'])
+        num_records = sum(record['records'] for record in records)
 
-        num_records = len(records)
+        # if start or enddate are empty, default values(earliest and latest records) will be retrieved from response
+        if not self.startdate:
+            self.startdate = records[0]['year']
+        if not self.enddate:
+            self.enddate = records[-1]['year']
+
+        logger.info(f'Total Records: {num_records}')
         return records, num_records
         
 
-    def is_dateformat(self, date_strings: tuple) -> Tuple[str, str]:
-        """Checks for date formats (YYYY-MM-DD)
+    def make_dateformat(self, date_strings: tuple) -> Tuple[str, str]:
+        """Converts to date format (YYYY-MM-DD) if not already
         
         Args:
             date_strings: tuple[str, str]
@@ -112,8 +116,8 @@ class ObisHandler():
         Returns:
             tuple of converted strings
         """
-        start = str(date_strings[0])
-        end = str(date_strings[1])
+        start = date_strings[0]
+        end = date_strings[1]
         if re.match(r"\d{4}-\d{2}-\d{2}", start):
             pass
         else:
@@ -136,12 +140,22 @@ class ObisHandler():
         """
         endpoint = '/occurrence'
         scientificname = whales[self.whale]['scientificname']
-        startdate, enddate = self.is_dateformat((startdate, enddate))
+        startdate, enddate = self.make_dateformat((startdate, enddate))
         params = {'scientificname': scientificname, 'startdate': startdate, 'enddate': enddate, 'size': self.size}
         
+        logger.info(f"Sending /occurrence request for {startdate}-{enddate}")
         response = self.api.request_api(endpoint, params)
         self.save_json(response, startdate, enddate)
 
+
+    def handle_large_record(self, year: str, start: str, previous_record_year: str):
+        """Send a request for a large record"""
+        # request the previously iterated years
+        if start and previous_record_year:
+            self.get_occurrences(start, previous_record_year)
+        # request the large record
+        self.get_occurrences(year, year)
+        
 
     def save_json(self, response: requests.Response, startdate: str, enddate: str) -> None:
         """Save a `requests.Response` to a json file
@@ -161,55 +175,41 @@ class ObisHandler():
             json.dump(response.json(), file, ensure_ascii=False, indent=4)
 
 
-    def api_requests(self) -> None:
-        """Send multiple requests to OBIS api depending on total records
-        of response and size limit"""
+    def batch_requests(self) -> None:
+        """Send requests in batches to OBIS api if total records exceeds the size limit"""
         records, num_records = self.get_records()
-        startdate = self.startdate
-        enddate = self.enddate
-        max_size = self.size
 
-        print(f'num_records: {num_records}')
-
-        # if the total number of records exceeds the size attribute, a series of requests are made
-        if max_size <= num_records:
-            current_size = 0
-
-            for i, rec in enumerate(records):
-                current_size += rec['records']
-                # update the startdate only if it has been set to None in elif block
-                startdate = str(rec['year']) if startdate == None else startdate
-                enddate = str(rec['year']) if enddate == None else enddate
-
-                if len(records) -1 == i:
-                    logger.info('Last record reached')
-                    self.get_occurrences(startdate, self.enddate)
-                elif current_size <= max_size:
-                    logger.info(f"current_size: {current_size}/{max_size}, {rec['year']}")
-                    enddate = str(rec['year'])
-                # if a single year's records exceed max_size, save data in its own separate file
-                elif rec['records'] > max_size:
-                    logger.info(f"Records for {rec['year']} exceeds size {rec['records']}/{max_size}")
-                    # save previous years
-                    self.get_occurrences(startdate, enddate)
-                    time.sleep(1.0)
-                    # save exceeding year by itself
-                    self.get_occurrences(str(rec['year']), str(rec['year']))
-                    time.sleep(1.0)
-                    current_size = 0
-                    logger.info(f"Resetting, current_size: 0, {rec['year']}")
-                    # do not set start/enddate to current record, set on next iteration
-                    startdate = None
-                    enddate = None
-                else:
-                    logger.info(f"end: {enddate}, current size {current_size}/{max_size}, {rec['year']}")
-                    self.get_occurrences(startdate, enddate)
-                    time.sleep(1.0)
-                    current_size = rec['records']
-                    logger.info(f"Resetting, current_size: {rec['records']}, {rec['year']}")
-                    # After saving past records, set startdate to current record year
-                    startdate = str(rec['year'])
-                    enddate = str(rec['year'])
         # make a single request if size is not exceeded
-        else:
-            self.get_occurrences(startdate, enddate)
+        if self.size >= num_records:
+            self.get_occurrences(self.startdate, self.enddate)
+            return
+        
+        start = self.startdate
+        previous_record_year = ''
+        current_size = 0
+
+        for i, record in enumerate(records):
+            year, year_records = record['year'], record['records']
+            # update the start only if value was set to empty
+            start = year if not start else start
+
+            # if a single year's records exceed the size limit, save records to their own separate file
+            if year_records > self.size:
+                self.handle_large_record(year, start, previous_record_year)
+                # new values to be set on next iteration
+                current_size = 0
+                start = ''
+                previous_record_year = ''
+                continue
+
+            if current_size + year_records > self.size:
+                self.get_occurrences(start, previous_record_year)
+                current_size = 0
+                start = year
+
+            current_size += year_records
+            previous_record_year = year
+
+            # if last record is reached
+            if i == len(records) - 1:
+                self.get_occurrences(start, self.enddate)
