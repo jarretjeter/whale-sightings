@@ -13,9 +13,9 @@ from typing import Optional
 logging.basicConfig(format='[%(asctime)s][%(module)s:%(lineno)04d] : %(message)s', level=INFO, stream=sys.stderr)
 logger = logging.getLogger(__name__)
 
-root_dir = Path().cwd()
-file = open(f"{root_dir}/config.json", 'r')
-config = json.loads(file.read())
+ROOT_DIR = Path().cwd()
+with open(f"{ROOT_DIR}/config.json", 'r') as file:
+    config = json.load(file)
 whales = config['whales']
 
 
@@ -87,7 +87,6 @@ class WhaleDataCleaner():
         format parsing examples: 1758, '1785/1913', '1800-01-01/1874-06-24', 
         '23 Aug 1951', 'Jan 10 1980, 'Oct 1949', '1925-11', '1900-1933
         """
-
         reg_text_formats = [
         r'^\d{1,2} [A-Za-z]+ \d{4}$',
         r'^[A-Za-z]+ \d{1,2} \d{4}$',
@@ -403,9 +402,9 @@ class WhaleDataCleaner():
 
         merged_df = self.merge_data()
         self.get_start_and_end(merged_df)
-        self.filename = f"{self.start}--{self.end}.csv"
-        logger.info(f'Saving dataframe to {output_dir}/{self.filename}')
-        merged_df.to_csv(f"{output_dir}/{self.filename}", index=False)
+        self.filename = f"{output_dir}/{self.start}--{self.end}.csv"
+        logger.info(f'Saving dataframe to {self.filename}')
+        merged_df.to_csv(f"{self.filename}", index=False)
         return merged_df
         
     

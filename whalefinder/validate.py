@@ -12,9 +12,9 @@ from typing import Optional, Tuple
 logging.basicConfig(format='[%(asctime)s][%(module)s:%(lineno)04d] : %(message)s', level=INFO, stream=sys.stderr)
 logger = logging.getLogger(__name__)
 
-root_dir = Path().cwd()
-file = open(f"{root_dir}/config.json", 'r')
-config = json.loads(file.read())
+ROOT_DIR = Path().cwd()
+with open(f"{ROOT_DIR}/config.json", 'r') as file:
+    config = json.load(file)
 whales = config['whales']
 
 
