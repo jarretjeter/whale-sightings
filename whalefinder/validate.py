@@ -78,14 +78,17 @@ class Results(BaseModel):
 
 class Validator():
     """
-    Class for retrieving files and running Pydantic model
+    Class for retrieving files and running Pydantic model validations
     """
     data_dir = './data'
 
 
     def __init__(self, whale: str, startdate: Optional[str]=None, enddate: Optional[str]=None) -> None:
         """
-        
+        whale: str
+            Name of file directory to search
+        startdate, enddate: str
+            Date range of files to match
         """
         if whale in whales:
             self.whale = whale
