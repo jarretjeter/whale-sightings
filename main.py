@@ -1,4 +1,4 @@
-from storage import to_mysql
+from storage import MySQLClient
 import typer
 from whalefinder import cleaner, obis, validate
 
@@ -16,8 +16,11 @@ def main(whale: str, startdate: str='', enddate: str=''):
     validator = validate.Validator(whale, startdate, enddate)
     valid_data, error_data = validator.validate_response()
     datacleaner = cleaner.WhaleDataCleaner(whale, valid_data, error_data, startdate, enddate)
-    datacleaner.process_and_save()
-    to_mysql(whale, datacleaner.filename)
+    df = datacleaner.process_and_save()
+
+    mysqlclient = MySQLClient()
+    with mysqlclient as client:
+        client.to_mysql(df)
 
 
 if __name__ == '__main__':
