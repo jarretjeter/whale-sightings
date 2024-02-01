@@ -159,7 +159,7 @@ class WhaleDataCleaner():
                 return int(date_str), 1, 1, int(date_str), 12, 31
             
         except ValueError as e:
-            logger.info(f"Failed to parse date format: {date_str}")
+            logger.info(f"Failed to process incorrect date format: {date_str}")
             return tuple([0]) * 6
     
 
@@ -211,6 +211,7 @@ class WhaleDataCleaner():
         """
         ocean_gdf = load_oceans()
         # Generate whale geodataframe with geometry point column using longitude(x),latitude(y) values
+        logger.info("Performing geodata operations..")
         points_df = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df['decimalLongitude'], df['decimalLatitude']), crs='EPSG:4326')
         # Create joined_df from spatial join intersections between points and polygons
         joined_df = gpd.sjoin(points_df, ocean_gdf, how='left', predicate='intersects')
