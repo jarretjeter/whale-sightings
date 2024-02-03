@@ -1,5 +1,5 @@
 from datetime import date
-from dateutil.parser import parse
+from dateutil.parser import parse, ParserError
 import json
 import logging
 from logging import INFO
@@ -46,36 +46,25 @@ class Results(BaseModel):
         '1913-03-17', '1849-12-04 23:12:00', '1849-12-04T23:12:00', 
         '1849-12-04T23:12:00Z', '1971-01-01 00:00:00+00', '1910-12-24T02:00'
 
-        unaccepted format examples: 
-        1758, '1785/1913', '1800-01-01/1874-06-24', '23 Aug 1951', 'Oct 1949', '1925-11', etc.
+        unaccepted format examples:
+        (these formats are parsable, but values end up being removed or added unintentionally)
+        '1800-01-01/1874-06-24', '1925-11', June 1758, etc.
         """
-        date_formats = [
-            r'^\d{4}-\d{2}-\d{2}$', 
-            r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$',
-            r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}Z$',
-            r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\+\d{2}$',
-            r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$',
-            r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}Z$',
-            r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}\+\d{2}$',
-            r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$',
-            r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$',
-            r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+\d{4}$',
-            r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+\d{2}:\d{2}$'
-            ]
-        
-        # If split dates are the same, except the timestamp (e.g. '2014-04-28T09:42:00/2014-04-28T10:50:00')
-        if '/' in value and '-' in value:
-            start_date, end_date = value.split('/')
-            time_format = re.compile(r'T.*')
-            start_date = re.sub(time_format, '', start_date)
-            end_date = re.sub(time_format, '', end_date)
-            if start_date == end_date:
-                value = start_date
-        for fmt in date_formats:
+        bad_formats = [
+            r'^\d{4}-\d{1,2}$', # 1990-03
+            r'^\d{1,2}-\d{4}$', # 03-1990
+            r'^\d{1,4}$', # 1985
+            r'^\d{1,2} [A-Za-z]+$', # 20 Nov
+            r'^[A-Za-z]+ \d{1,2}$', # Oct 15
+            r'^[A-Za-z]+ \d{4}$', # Oct 1970
+            r'^\d{4} [A-Za-z]+$', # 1970 Oct
+            r'^.*/.*$' # string with any '/' character
+        ]
+        # Matching bad values should be handled further down the script
+        for fmt in bad_formats:
             if re.match(fmt, value):
-                return parse(value).date()
-        else:
-            raise ValueError(f"eventDate '{value}' does not match any accepted format.")
+                raise ValueError(f"eventDate '{value}' is a bad format.")
+        return parse(value).date()
 
 
 class Validator():

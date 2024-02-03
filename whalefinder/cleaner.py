@@ -80,34 +80,29 @@ class WhaleDataCleaner():
         return df
     
 
-    def parse_dates(self, date_str: str) -> tuple:
+    def split_dates(self, date_str: str) -> tuple:
         """
-        Parse the many different formats that the eventDate field comes in.
-
-        format parsing examples: 1758, '1785/1913', '1800-01-01/1874-06-24', 
-        '23 Aug 1951', 'Jan 10 1980, 'Oct 1949', '1925-11', '1900-1933
+        Split the different formats that the eventDate field comes in into
+        start_year, start_month, start_day and end_year, end_month, end_day.
         """
         reg_text_formats = [
-        r'^\d{1,2} [A-Za-z]+ \d{4}$',
-        r'^[A-Za-z]+ \d{1,2} \d{4}$',
-        r'^[A-Za-z]+ \d{4}$',
-        r'^\d{4} [A-Za-z]+$',
-        r'^\d{4} [A-Za-z]+ \d{1,2}$'
-        ]
+        r'^[A-Za-z]+ \d{4}$', # January 2000
+        r'^\d{4} [A-Za-z]+$', # 2000 January
+        r'^\d{1,2} [A-Za-z]+$', # 07 January
+        r'^[A-Za-z]+ \d{1,2}$' # January 07
+            ]
 
+        # formats for abbreviated and non-abbreviated months
         parsed_formats = [
-            '%d %b %Y',
-            '%b %d %Y',
             '%b %Y',
             '%Y %b',
-            '%Y %b %d',
-            # Keep abbreviated and full month formats separate
-            '%d %B %Y',
-            '%B %d %Y',
+            '%d %b',
+            '%b %d',
             '%B %Y',
             '%Y %B',
-            '%Y %B %d'
-        ]
+            '%d %B',
+            '%B %d'
+            ]
 
         # remove any potential commas and leading/trailing whitespace
         date_str = date_str.replace(',', '').lstrip(' ').rstrip(' ')
@@ -125,20 +120,27 @@ class WhaleDataCleaner():
                         return (date.year, date.month, date.day) * 2
                 except ValueError as e:
                     pass
-        
+
         try:
             # PARSING DATES WITH NO LETTER CHARACTERS
+            # ex: '1972-07-10/1972-07-14'
             if '/' in date_str and '-' in date_str:
                 start_date, end_date = date_str.split('/')
+                # Remove any potential timezone strings
+                time_format = re.compile(r'T.*')
+                start_date = re.sub(time_format, '', start_date)
+                end_date = re.sub(time_format, '', end_date)
                 start_year, start_month, start_day = start_date.split('-')
                 end_year, end_month, end_day = end_date.split('-')
                 return tuple(map(int, (start_year, start_month, start_day, end_year, end_month, end_day)))
             
-            elif '/' in date_str:
+            # ex: '1952/1955'
+            elif '/' in date_str and '-' not in date_str:
                 start_year, end_year = date_str.split('/')
                 return int(start_year), 1, 1, int(end_year), 12, 31
             
-            elif '-' in date_str:
+            # ex: 1952-1955
+            elif '-' in date_str and '/' not in date_str:
                 date_parts = date_str.split('-')
                 if len(date_parts) == 2:
                     year, month = map(int, (date_parts))
@@ -158,7 +160,7 @@ class WhaleDataCleaner():
             else:
                 return int(date_str), 1, 1, int(date_str), 12, 31
             
-        except ValueError as e:
+        except ValueError:
             logger.info(f"Failed to process incorrect date format: {date_str}")
             return tuple([0]) * 6
     
@@ -308,7 +310,7 @@ class WhaleDataCleaner():
         """
         if not error_df.empty:
             num_errors = len(error_df)
-            error_df[['start_year', 'start_month', 'start_day', 'end_year', 'end_month', 'end_day']] = error_df['eventDate'].apply(lambda x: pd.Series(self.parse_dates(x)))
+            error_df[['start_year', 'start_month', 'start_day', 'end_year', 'end_month', 'end_day']] = error_df['eventDate'].apply(lambda x: pd.Series(self.split_dates(x)))
             error_df['processed'] = (error_df[['start_year', 'start_month', 'start_day', 'end_year', 'end_month', 'end_day']] != 0).all(axis=1)
             
             # Differentiate rows that were successfully processed
@@ -340,7 +342,7 @@ class WhaleDataCleaner():
         valid_data = self.valid_data
         if valid_data['validated']:
             df = pd.DataFrame([{k:v for k,v in item.items()} for item in valid_data['validated']])
-            df[['start_year', 'start_month', 'start_day', 'end_year', 'end_month', 'end_day']] = df['eventDate'].apply(lambda x: pd.Series(self.parse_dates(x)))
+            df[['start_year', 'start_month', 'start_day', 'end_year', 'end_month', 'end_day']] = df['eventDate'].apply(lambda x: pd.Series(self.split_dates(x)))
             return df
         else:
             df = pd.DataFrame({'': []})
