@@ -5,7 +5,7 @@ Photo by <a href="https://unsplash.com/@mero_dnt?utm_content=creditCopyText&utm_
   
 
 
-### This is a data engineering project focused on processing and managing whale sighting data. It sends requests to the Ocean Biodiversity Information System's API to extract relevant data, then validates, processes and cleans it, and finally stores it in a MySQL database.
+#### This is a data engineering project focused on processing and managing whale sighting data. It sends requests to the Ocean Biodiversity Information System's API to extract relevant data, then validates, processes and cleans it, and finally stores it in a MySQL database.
 
 
 ## Tools
