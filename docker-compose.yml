@@ -1,0 +1,19 @@
+services:
+
+  etl:
+    build: .
+    container_name: whale-etl
+    networks:
+      - whale-network
+
+  db:
+    build: ./db
+    container_name: whale-db
+    restart: always
+    networks:
+      - whale-network
+    environment:
+      MYSQL_ROOT_PASSWORD: 
+
+networks:
+  whale-network:
