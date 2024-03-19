@@ -18,16 +18,15 @@ with open(f"{ROOT_DIR}/config.json", 'r') as file:
 # Whales Dictionary
 whales = config['whales']
 
-session = requests.Session()
-retries = Retry(total=5, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 504])
-session.mount('https://', HTTPAdapter(max_retries=retries))
-
 
 class ApiClient():
     """
     Client for the Obis API
     """
     base_url = "https://api.obis.org/v3"
+    session = requests.Session()
+    retries = Retry(total=5, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 504])
+    session.mount('https://', HTTPAdapter(max_retries=retries))
 
     def __init__(self) -> None:
         pass
@@ -35,6 +34,7 @@ class ApiClient():
     def request_api(self, endpoint: str, params: dict) -> requests.Response:
         """
         Send a get request to the api
+        
         Args:
             endpoint: str
                 API endpoint to request
@@ -44,7 +44,7 @@ class ApiClient():
             requests.Response
         """
         try:
-            response = session.get(f"{self.base_url}/{endpoint}", params=params)
+            response = self.session.get(f"{self.base_url}/{endpoint}", params=params)
             time.sleep(1.0)
             return response
         except requests.RequestException:
