@@ -1,4 +1,4 @@
-from storage import MySQLClient
+from db import MySQLClient
 import typer
 from whalefinder import cleaner, obis, validate
 
