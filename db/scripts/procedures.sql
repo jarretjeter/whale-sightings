@@ -1,3 +1,5 @@
+USE whale_sightings;
+
 DELIMITER //
 CREATE PROCEDURE insert_or_update_location(wb_name VARCHAR(255))
 -- Procedure for handling logic of creating ids for location table rows based on unique name values

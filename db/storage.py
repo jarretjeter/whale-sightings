@@ -19,6 +19,7 @@ with open(f"{ROOT_DIR}/config.json", 'r') as file:
 
 # MySQL Configurations
 local_db = config['database']['local']
+host = local_db['host']
 user = local_db['user']
 password = local_db['password']
 db_name = local_db['db_name']
@@ -31,7 +32,7 @@ class MySQLClient:
 
     def __init__(self) -> None:
         logger.info('Creating MySQL connection..')
-        self.conn = pymysql.connect(host='localhost',
+        self.conn = pymysql.connect(host=host,
                             user=user,
                             password=password,
                             database=db_name,
