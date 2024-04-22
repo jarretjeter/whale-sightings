@@ -19,7 +19,7 @@ with open(f"{ROOT_DIR}/config.json", 'r') as file:
 whales = config['whales']
 
 
-class ApiClient():
+class ApiClient:
     """
     Client for the Obis API
     """
@@ -51,7 +51,7 @@ class ApiClient():
             sys.exit("Failed to connect to the API")
         
 
-class ObisHandler():
+class ObisHandler:
     """Object for handling whale data from specific OBIS api endpoints
     """
     data_dir = './data'

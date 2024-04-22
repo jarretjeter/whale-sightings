@@ -7,11 +7,12 @@ import pymysql.cursors
 import sys
 import typer
 from typing import Union
+from typing_extensions import Self
 
-
-logging.basicConfig(format='[%(levelname)-5s][%(asctime)s][%(module)s:%(lineno)04d] : %(message)s', level=INFO, stream=sys.stderr)
+logging.basicConfig(
+    format='[%(levelname)-5s][%(asctime)s][%(module)s:%(lineno)04d] : %(message)s', level=INFO, stream=sys.stderr
+)
 logger = logging.getLogger(__name__)
-
 
 ROOT_DIR = Path().cwd()
 with open(f"{ROOT_DIR}/config.json", 'r') as file:
@@ -32,23 +33,21 @@ class MySQLClient:
 
     def __init__(self) -> None:
         logger.info('Creating MySQL connection..')
-        self.conn = pymysql.connect(host=host,
-                            user=user,
-                            password=password,
-                            database=db_name,
-                            cursorclass=pymysql.cursors.DictCursor)
-        
+        self.conn = pymysql.connect(
+            host=host,
+            user=user,
+            password=password,
+            database=db_name,
+            cursorclass=pymysql.cursors.DictCursor
+        )
         self.cursor = self.conn.cursor()
 
-
-    def __enter__(self) -> None:
+    def __enter__(self) -> Self:
         return self
-    
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         self.conn.close()
         logger.info('Connection closed.')
-
 
     def close(self, commit=True) -> None:
         if commit:
@@ -56,19 +55,15 @@ class MySQLClient:
         self.conn.close()
         logger.info("Connection closed.")
 
-
     def execute(self, sql, args: object=None) -> None:
         self.cursor.execute(sql, args)
-
 
     def query(self, query, args: object=None) -> Union[dict, None]:
         self.cursor.execute(query, args)
         print(self.cursor.fetchone())
 
-
     def commit(self) -> None:
         self.conn.commit()
-
 
     def insert_occurrences(self, row, waterBodyId) -> None:
         """
@@ -82,8 +77,6 @@ class MySQLClient:
         Returns:
             None
         """
-        # If eventDate is not in the format of `YYYY`
-        # if len(str(row.eventDate)) != 4:
         sql = """INSERT INTO `occurrences` 
                     (`id`, `eventDate`, `waterBodyId`, `latitude`, `longitude`, `speciesId`, `individualCount`,
                     `start_year`, `start_month`, `start_day`, `end_year`, `end_month`, `end_day`, `date_is_valid`)
@@ -99,7 +92,6 @@ class MySQLClient:
             row.occurrenceID, row.eventDate, waterBodyId, row.decimalLatitude, row.decimalLongitude, row.speciesid, row.individualCount, 
             row.start_year, row.start_month, row.start_day, row.end_year, row.end_month, row.end_day, row.date_is_valid
             ))
-        
 
     def insert_species(self, row) -> None:
         """
@@ -121,13 +113,11 @@ class MySQLClient:
                         UPDATE speciesName=VALUES(speciesName), vernacularName=VALUES(vernacularName)"""
         self.cursor.execute(sql, (row.speciesid, row.species, vernacularName))
 
-
     def insert_or_update_location(self, row) -> Union[int, None]:
         self.cursor.callproc('insert_or_update_location', (row.waterBody,))
         result = self.cursor.fetchone()
         waterBodyId = result['wb_id'] if result else None
         return waterBodyId
-
 
     def to_mysql(self, df: pd.DataFrame) -> None:
         """

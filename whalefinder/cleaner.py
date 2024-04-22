@@ -31,14 +31,16 @@ def load_oceans() -> gpd.GeoDataFrame:
     return gdf
 
 
-class WhaleDataCleaner():
-    """Pandas and GeoPandas functionalities for handling whale data 
+class WhaleDataCleaner:
+    """Pandas and GeoPandas functionalities for handling whale data
     obtained from OBIS (https://obis.org/).
     """
     data_dir = './data'
 
-
-    def __init__(self, whale: str, valid_data: dict, error_data: dict, startdate: Optional[str]=None, enddate: Optional[str]=None) -> None:
+    def __init__(
+            self, whale: str, valid_data: dict, error_data: dict,
+            startdate: Optional[str]=None, enddate: Optional[str]=None
+    ) -> None:
         """
         Args:
             whale: str
@@ -58,14 +60,13 @@ class WhaleDataCleaner():
         self.valid_data = valid_data
         self.error_data = error_data
 
-
     def fill_in(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Fill in NaN values for occurrenceID and vernacularName columns
 
         Args: 
             df: pd.DataFrame
-                DataFrame object to operate on
+                object to operate on
         Returns:
             `pd.DataFrame`
         """
@@ -78,7 +79,6 @@ class WhaleDataCleaner():
         whale = whale.replace('_', ' ').title()
         df['vernacularName'] = df['vernacularName'].fillna(whale)
         return df
-    
 
     def split_dates(self, date_str: str) -> tuple:
         """
@@ -86,10 +86,10 @@ class WhaleDataCleaner():
         start_year, start_month, start_day and end_year, end_month, end_day.
         """
         reg_text_formats = [
-        r'^[A-Za-z]+ \d{4}$', # January 2000
-        r'^\d{4} [A-Za-z]+$', # 2000 January
-        r'^\d{1,2} [A-Za-z]+$', # 07 January
-        r'^[A-Za-z]+ \d{1,2}$' # January 07
+            r'^[A-Za-z]+ \d{4}$',  # January 2000
+            r'^\d{4} [A-Za-z]+$',  # 2000 January
+            r'^\d{1,2} [A-Za-z]+$',  # 07 January
+            r'^[A-Za-z]+ \d{1,2}$'  # January 07
             ]
 
         # formats for abbreviated and non-abbreviated months
@@ -145,7 +145,7 @@ class WhaleDataCleaner():
                 if len(date_parts) == 2:
                     year, month = map(int, (date_parts))
                     # check if month is an actual month and not a year, e.g. '2003-05'
-                    if month > 0 and month <= 12:
+                    if 0 < month <= 12:
                         end_day = monthrange(year, month)[1]
                         return year, month, 1, year, month, end_day
                     else:
@@ -163,7 +163,6 @@ class WhaleDataCleaner():
         except ValueError:
             logger.info(f"Failed to process incorrect date format: {date_str}")
             return tuple([0]) * 6
-    
 
     def is_valid_date(self, date_str: str) -> bool:
         """
@@ -174,7 +173,6 @@ class WhaleDataCleaner():
             return True
         else:
             return False
-
 
     def get_start_and_end(self, df: pd.DataFrame) -> None:
         """
@@ -200,7 +198,6 @@ class WhaleDataCleaner():
         else:
             pass
 
-
     def get_ocean(self, df: pd.DataFrame) -> pd.DataFrame:
         """Check for longitude/latitude point intersections 
         between an ocean GeoDataFrame and whale GeoDataFrame to get consistent ocean locations
@@ -220,7 +217,6 @@ class WhaleDataCleaner():
         # Update waterBody names
         df['waterBody'] = joined_df['name']
         return df
-    
 
     def build_error_dataframe(self) -> pd.DataFrame:
         """
@@ -254,7 +250,6 @@ class WhaleDataCleaner():
             logger.info(f"No errors present")
             error_df = pd.DataFrame({'': []})
             return error_df 
-        
 
     def error_df_to_json(self, error_df: pd.DataFrame) -> None:
         """
@@ -296,7 +291,6 @@ class WhaleDataCleaner():
         with open(f'{output_dir}/error_data.json', 'w') as file:
             print(f"Saving errors to {file.name}")
             json.dump(error_dict, file, ensure_ascii=False, indent=4)
-            
 
     def process_error_data(self, error_df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -330,7 +324,6 @@ class WhaleDataCleaner():
         
         else:
             return error_df
-        
 
     def process_valid_data(self) -> pd.DataFrame:
         """
@@ -347,7 +340,6 @@ class WhaleDataCleaner():
         else:
             df = pd.DataFrame({'': []})
             return df
-
 
     def merge_data(self) -> pd.DataFrame:
         """
@@ -392,7 +384,6 @@ class WhaleDataCleaner():
             logger.info("No data to read.")
             sys.exit()
 
-
     def process_and_save(self) -> pd.DataFrame:
         """
         Start transformation processes and save to csv file
@@ -405,9 +396,7 @@ class WhaleDataCleaner():
 
         merged_df = self.merge_data()
         self.get_start_and_end(merged_df)
-        self.filename = f"{output_dir}/{self.start}--{self.end}.csv"
-        logger.info(f'Saving dataframe to {self.filename}')
-        merged_df.to_csv(f"{self.filename}", index=False)
+        filename = f"{output_dir}/{self.start}--{self.end}.csv"
+        logger.info(f'Saving dataframe to {filename}')
+        merged_df.to_csv(f"{filename}", index=False)
         return merged_df
-        
-    
