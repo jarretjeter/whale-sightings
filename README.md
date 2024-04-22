@@ -110,4 +110,5 @@ Available online at https://www.marineregions.org/. https://doi.org/10.14284/542
 ## License
 [MIT](https://github.com/jarretjeter/whale-sightings/blob/main/LICENSE.txt)
 
+## Contact
 Contact me here on github or at jarretjeter@gmail.com if you have any questions or issues.
