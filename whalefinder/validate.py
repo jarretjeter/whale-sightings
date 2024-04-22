@@ -37,10 +37,9 @@ class Results(BaseModel):
     basisOfRecord: str = Field(default=None)
     bibliographicCitation: str = Field(default=None)
 
-
     @field_validator('eventDate', mode='before')
     @classmethod
-    def check_eventDate(cls, value) -> date:
+    def check_eventdate(cls, value) -> date:
         """
         accepted format examples: 
         '1913-03-17', '1849-12-04 23:12:00', '1849-12-04T23:12:00', 
@@ -67,12 +66,11 @@ class Results(BaseModel):
         return parse(value).date()
 
 
-class Validator():
+class Validator:
     """
     Class for retrieving files and running Pydantic model validations
     """
     data_dir = './data'
-
 
     def __init__(self, whale: str, startdate: Optional[str]=None, enddate: Optional[str]=None) -> None:
         """
@@ -87,7 +85,6 @@ class Validator():
             raise ValueError(f'{whale} not in whales dictionary. {whales.keys()}')
         self.startdate = startdate
         self.enddate = enddate
-
 
     def match_files(self) -> list:
         """
@@ -144,7 +141,6 @@ class Validator():
                 return files
             
             return matched_files
-    
 
     def get_data(self) -> dict:
         """
@@ -164,7 +160,6 @@ class Validator():
                         data['results'].append(d)
 
         return data
-    
 
     def validate_response(self) -> Tuple[dict, dict]:
         """
@@ -193,5 +188,4 @@ class Validator():
                 num_errors += len(error_details)
 
         logger.info(f"Validated: {len(valid_data['validated'])}, Errors: {num_errors}")
-
         return valid_data, error_data
