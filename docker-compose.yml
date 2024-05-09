@@ -13,7 +13,7 @@ services:
     networks:
       - whale-network
     environment:
-      MYSQL_ROOT_PASSWORD: 
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
 
 networks:
   whale-network:
