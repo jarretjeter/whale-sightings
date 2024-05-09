@@ -3,10 +3,10 @@
         {
             "local": 
                 {
-                    "host": "",
-                    "user": "",
-                    "password": "",
-                    "db_name": ""
+                    "host": "whale-db",
+                    "user": "root",
+                    "password": "<MYSQL_ROOT_PASSWORD>",
+                    "db_name": "whale_sightings"
                 }
         },
         
@@ -14,6 +14,11 @@
         {
             "blue_whale": {"scientificname": "Balaenoptera musculus"}, 
             "sperm_whale": {"scientificname": "Physeter macrocephalus"}, 
-            "beluga_whale": {"scientificname": "Delphinapterus leucas"}
+            "beluga_whale": {"scientificname": "Delphinapterus leucas"},
+            "narwhal": {"scientificname": "Monodon monoceros"},
+            "humpback_whale": {"scientificname": "Megaptera novaeangliae"},
+            "gray_whale": {"scientificname": "Eschrichtius robustus"},
+            "bowhead_whale": {"scientificname": "Balaena mysticetus"},
+            "killer_whale": {"scientificname": "Orcinus orca"}
         }
 }
