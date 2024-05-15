@@ -5,15 +5,32 @@ services:
     container_name: whale-etl
     networks:
       - whale-network
+    depends_on:
+      - db
 
   db:
     build: ./db
     container_name: whale-db
     restart: always
+    volumes:
+      - whale-db:/var/lib/mysql
     networks:
       - whale-network
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
 
+  jupyter:
+    image: jupyter/scipy-notebook:latest
+    container_name: whale-jupyter
+    ports:
+      - "8888:8888"
+    depends_on:
+      - db
+    networks:
+      - whale-network
+
 networks:
   whale-network:
+
+volumes:
+  whale-db:
