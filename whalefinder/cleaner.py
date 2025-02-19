@@ -1,22 +1,19 @@
 from calendar import monthrange
 import datetime
-import geopandas as gpd
 import json
-import logging
-from logging import INFO
-import pandas as pd
 from pathlib import Path
 import re
 import sys
 from typing import Optional
 
-logging.basicConfig(format='[%(asctime)s][%(module)s:%(lineno)04d] : %(message)s', level=INFO, stream=sys.stderr)
-logger = logging.getLogger(__name__)
+import geopandas as gpd
+import pandas as pd
 
-ROOT_DIR = Path().cwd()
-with open(f"{ROOT_DIR}/config.json", 'r') as file:
-    config = json.load(file)
-whales = config['whales']
+from logging_setup import setup_logging
+from whales import whale_names
+
+
+logger = setup_logging()
 
 
 def load_oceans() -> gpd.GeoDataFrame:
@@ -27,20 +24,17 @@ def load_oceans() -> gpd.GeoDataFrame:
         geopandas.GeoDataFrame
     """
     logger.info('Loading ocean shapefile..')
-    gdf = gpd.read_file('data/Global_Oceans_and_Seas_version_1/goas_v01.shp')
+    gdf = gpd.read_file('data/GOaS_v1_20211214/goas_v01.shp')
     return gdf
 
 
 class WhaleDataCleaner:
-    """Pandas and GeoPandas functionalities for handling whale data
+    """Pandas and GeoPandas functionalities for handling whale data 
     obtained from OBIS (https://obis.org/).
     """
     data_dir = './data'
 
-    def __init__(
-            self, whale: str, valid_data: dict, error_data: dict,
-            startdate: Optional[str]=None, enddate: Optional[str]=None
-    ) -> None:
+    def __init__(self, whale: str, valid_data: dict, error_data: dict, startdate: Optional[str]=None, enddate: Optional[str]=None) -> None:
         """
         Args:
             whale: str
@@ -51,10 +45,10 @@ class WhaleDataCleaner:
                 Used for csv writing.
                 If no arguments are supplied, a function call will get values
         """
-        if whale in whales:
+        if whale in whale_names:
             self.whale = whale
         else:
-            raise ValueError(f'{whale} not in whales dictionary. {whales.keys()}')
+            raise ValueError(f'{whale} not in whales dictionary. {whale_names.keys()}')
         self.start = startdate
         self.end = enddate
         self.valid_data = valid_data
@@ -66,7 +60,7 @@ class WhaleDataCleaner:
 
         Args: 
             df: pd.DataFrame
-                object to operate on
+                DataFrame object to operate on
         Returns:
             `pd.DataFrame`
         """
@@ -86,10 +80,10 @@ class WhaleDataCleaner:
         start_year, start_month, start_day and end_year, end_month, end_day.
         """
         reg_text_formats = [
-            r'^[A-Za-z]+ \d{4}$',  # January 2000
-            r'^\d{4} [A-Za-z]+$',  # 2000 January
-            r'^\d{1,2} [A-Za-z]+$',  # 07 January
-            r'^[A-Za-z]+ \d{1,2}$'  # January 07
+        r'^[A-Za-z]+ \d{4}$', # January 2000
+        r'^\d{4} [A-Za-z]+$', # 2000 January
+        r'^\d{1,2} [A-Za-z]+$', # 07 January
+        r'^[A-Za-z]+ \d{1,2}$' # January 07
             ]
 
         # formats for abbreviated and non-abbreviated months
@@ -145,7 +139,7 @@ class WhaleDataCleaner:
                 if len(date_parts) == 2:
                     year, month = map(int, (date_parts))
                     # check if month is an actual month and not a year, e.g. '2003-05'
-                    if 0 < month <= 12:
+                    if month > 0 and month <= 12:
                         end_day = monthrange(year, month)[1]
                         return year, month, 1, year, month, end_day
                     else:
@@ -161,7 +155,7 @@ class WhaleDataCleaner:
                 return int(date_str), 1, 1, int(date_str), 12, 31
             
         except ValueError:
-            logger.info(f"Failed to process incorrect date format: {date_str}")
+            logger.warning(f"Failed to process incorrect date format: {date_str}")
             return tuple([0]) * 6
 
     def is_valid_date(self, date_str: str) -> bool:
@@ -217,7 +211,7 @@ class WhaleDataCleaner:
         # Update waterBody names
         df['waterBody'] = joined_df['name']
         return df
-
+    
     def build_error_dataframe(self) -> pd.DataFrame:
         """
         Build dataframe from data that failed validation for processing attempts
@@ -250,7 +244,8 @@ class WhaleDataCleaner:
             logger.info(f"No errors present")
             error_df = pd.DataFrame({'': []})
             return error_df 
-
+        
+    # TODO Is this still necessary?
     def error_df_to_json(self, error_df: pd.DataFrame) -> None:
         """
         Convert failed error processing attempts back to a dictionary and save to json
@@ -288,10 +283,11 @@ class WhaleDataCleaner:
         error_dict = re.sub(nan_regex_pattern, 'null', error_dict)
         error_dict = json.loads(error_dict)
 
+        #TODO write code to attempt reprocessing?
         with open(f'{output_dir}/error_data.json', 'w') as file:
             print(f"Saving errors to {file.name}")
             json.dump(error_dict, file, ensure_ascii=False, indent=4)
-
+            
     def process_error_data(self, error_df: pd.DataFrame) -> pd.DataFrame:
         """
         Handle error data. Errors successfully processed will continue through the pipeline.
@@ -324,7 +320,7 @@ class WhaleDataCleaner:
         
         else:
             return error_df
-
+        
     def process_valid_data(self) -> pd.DataFrame:
         """
         Perform minor transformations on valid data
@@ -357,7 +353,7 @@ class WhaleDataCleaner:
             merged_df['date_is_valid'] = merged_df['eventDate'].apply(self.is_valid_date)
             num_duplicates = merged_df[merged_df.duplicated(subset=['eventDate', 'decimalLatitude', 'decimalLongitude'])]
             merged_df = merged_df.drop_duplicates(subset=['eventDate', 'decimalLatitude', 'decimalLongitude'], keep='first')
-            logger.info(f"{len(num_duplicates)} duplicate rows removed")
+            logger.info(f"{len(num_duplicates)} duplicate records removed")
             merged_df = self.fill_in(merged_df)
             merged_df = self.get_ocean(merged_df)
             return merged_df
@@ -396,7 +392,9 @@ class WhaleDataCleaner:
 
         merged_df = self.merge_data()
         self.get_start_and_end(merged_df)
-        filename = f"{output_dir}/{self.start}--{self.end}.csv"
-        logger.info(f'Saving dataframe to {filename}')
-        merged_df.to_csv(f"{filename}", index=False)
+        # TODO do I still need to save csv files?
+        self.filename = f"{output_dir}/{self.start}--{self.end}.csv"
+        logger.info(f'Saving dataframe to {self.filename}')
+        merged_df.to_csv(f"{self.filename}", index=False)
         return merged_df
+        

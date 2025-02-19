@@ -1,21 +1,18 @@
 from datetime import date
 from dateutil.parser import parse, ParserError
 import json
-import logging
-from logging import INFO
 from pathlib import Path
-from pydantic import BaseModel, ConfigDict, Field, field_validator, ValidationError
 import re
 import sys
 from typing import Optional, Tuple
 
-logging.basicConfig(format='[%(asctime)s][%(module)s:%(lineno)04d] : %(message)s', level=INFO, stream=sys.stderr)
-logger = logging.getLogger(__name__)
+from pydantic import BaseModel, ConfigDict, Field, field_validator, ValidationError
 
-ROOT_DIR = Path().cwd()
-with open(f"{ROOT_DIR}/config.json", 'r') as file:
-    config = json.load(file)
-whales = config['whales']
+from logging_setup import setup_logging
+from whales import whale_names
+
+
+logger = setup_logging()
 
 
 class Results(BaseModel):
@@ -37,6 +34,7 @@ class Results(BaseModel):
     basisOfRecord: str = Field(default=None)
     bibliographicCitation: str = Field(default=None)
 
+
     @field_validator('eventDate', mode='before')
     @classmethod
     def check_eventdate(cls, value) -> date:
@@ -46,7 +44,7 @@ class Results(BaseModel):
         '1849-12-04T23:12:00Z', '1971-01-01 00:00:00+00', '1910-12-24T02:00'
 
         unaccepted format examples:
-        (these formats are parsable, but values end up being removed or added unintentionally)
+        (formats may be parsable, but values end up being removed or added unintentionally)
         '1800-01-01/1874-06-24', '1925-11', June 1758, etc.
         """
         bad_formats = [
@@ -79,10 +77,10 @@ class Validator:
         startdate, enddate: str
             Date range of files to match
         """
-        if whale in whales:
+        if whale in whale_names:
             self.whale = whale
         else:
-            raise ValueError(f'{whale} not in whales dictionary. {whales.keys()}')
+            raise ValueError(f'{whale} not in whales dictionary. {whale_names.keys()}')
         self.startdate = startdate
         self.enddate = enddate
 
@@ -106,7 +104,7 @@ class Validator:
                 start_year = parse(self.startdate).year
                 end_year = parse(self.enddate).year
 
-                for file in files:
+                for file in files:  # start and end between a specific year
                     match = re.search(r'(\d{4})-\d{2}-\d{2}\--(\d{4})-\d{2}-\d{2}', file.name)
                     if match:
                         file_start_year = int(match.group(1))
@@ -115,7 +113,7 @@ class Validator:
                         if start_year <= file_start_year <= end_year and start_year <= file_end_year <= end_year:
                             matched_files.append(file)
 
-            elif self.startdate and not self.enddate:
+            elif self.startdate and not self.enddate:  # start from a certain file year to the last file found
                 start_year = parse(self.startdate).year
 
                 for file in files:
@@ -126,7 +124,7 @@ class Validator:
                         if start_year <= file_start_year:
                             matched_files.append(file)
 
-            elif not self.startdate and self.enddate:
+            elif not self.startdate and self.enddate:  # starting from the 1st found file and up to a certain point
                 end_year = parse(self.enddate).year
 
                 for file in files:
@@ -137,11 +135,15 @@ class Validator:
                         if file_end_year <= end_year:
                             matched_files.append(file)
 
-            else:
+            else:  # return all files
                 return files
             
             return matched_files
-
+        
+        else:
+            logger.warning("No json files were found to validate, try fetching from the Obis API first")
+            sys.exit(1)
+    
     def get_data(self) -> dict:
         """
         Load data from multiple files into a single dictionary
@@ -158,9 +160,8 @@ class Validator:
                 if 'results' in results.keys():
                     for d in results['results']:
                         data['results'].append(d)
-
         return data
-
+    
     def validate_response(self) -> Tuple[dict, dict]:
         """
         Validate data from API response
