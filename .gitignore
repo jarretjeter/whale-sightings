@@ -7,6 +7,4 @@ venv/
 
 
 # Files
-*.ipynb
-config.json
 .env
