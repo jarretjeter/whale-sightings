@@ -1,22 +1,18 @@
 import json
-import logging
-from logging import INFO
 from pathlib import Path
 import re
-import requests
-from requests.adapters import HTTPAdapter, Retry
 import sys
 import time
 from typing import Dict, List, Optional, Tuple
 
-logging.basicConfig(format='[%(asctime)s][%(module)s:%(lineno)04d] : %(message)s', level=INFO, stream=sys.stderr)
-logger = logging.getLogger(__name__)
+import requests
+from requests.adapters import HTTPAdapter, Retry
 
-ROOT_DIR = Path().cwd()
-with open(f"{ROOT_DIR}/config.json", 'r') as file:
-    config = json.load(file)
-# Whales Dictionary
-whales = config['whales']
+from logging_setup import setup_logging
+from whales import whale_names
+
+
+logger = setup_logging()
 
 
 class ApiClient:
@@ -31,7 +27,7 @@ class ApiClient:
     def __init__(self) -> None:
         pass
 
-    def request_api(self, endpoint: str, params: dict) -> requests.Response:
+    def send_request(self, endpoint: str, params: dict) -> requests.Response:
         """
         Send a get request to the api
         
@@ -71,14 +67,13 @@ class ObisHandler:
                 The API does not accept a size limit greater than 10,000
         """
         self.api = api
-        if whale in whales:
+        if whale in whale_names:
             self.whale = whale
         else:
-            raise ValueError(f'{whale} not in whales dictionary. {whales.keys()}')
+            raise ValueError(f'{whale} not in whale_names dictionary. {whale_names.keys()}')
         self.startdate = startdate
         self.enddate = enddate
         self.size = size
-        
 
     def get_records(self) -> Tuple[List[Dict], int]:
         """Retrieve total number of records from a request to the /statistics/years endpoint
@@ -87,11 +82,11 @@ class ObisHandler:
             tuple[list[dict], int]
         """
         endpoint = '/statistics/years'
-        scientificname = whales[self.whale]['scientificname']
+        scientificname = whale_names[self.whale]['scientificname']
         params = {'scientificname': scientificname, 'startdate': self.startdate, 'enddate': self.enddate}
 
         logger.info(f"Getting records for {self.whale}")
-        records = self.api.request_api(endpoint, params)
+        records = self.api.send_request(endpoint, params)
         records = records.json()
 
         for record in records: record['year'] = str(record['year'])
@@ -105,7 +100,6 @@ class ObisHandler:
 
         logger.info(f'Total Records: {num_records}')
         return records, num_records
-        
 
     def make_dateformat(self, date_strings: tuple) -> Tuple[str, str]:
         """Converts to date format (YYYY-MM-DD) if not already
@@ -128,7 +122,6 @@ class ObisHandler:
             end = end + '-12-31'
         return start, end
 
-
     def get_occurrences(self, startdate: str, enddate: str) -> None:
         """Send a get request to the OBIS api's /occurrence endpoint
 
@@ -139,14 +132,13 @@ class ObisHandler:
             None
         """
         endpoint = '/occurrence'
-        scientificname = whales[self.whale]['scientificname']
+        scientificname = whale_names[self.whale]['scientificname']
         startdate, enddate = self.make_dateformat((startdate, enddate))
         params = {'scientificname': scientificname, 'startdate': startdate, 'enddate': enddate, 'size': self.size}
         
-        logger.info(f"Sending /occurrence request for {startdate}-{enddate}")
-        response = self.api.request_api(endpoint, params)
+        logger.info(f"Sending /occurrence request for date period: {startdate}-{enddate}")
+        response = self.api.send_request(endpoint, params)
         self.save_json(response, startdate, enddate)
-
 
     def handle_large_record(self, year: str, start: str, previous_record_year: str):
         """Send a request for a large record"""
@@ -155,7 +147,6 @@ class ObisHandler:
             self.get_occurrences(start, previous_record_year)
         # request the large record
         self.get_occurrences(year, year)
-        
 
     def save_json(self, response: requests.Response, startdate: str, enddate: str) -> None:
         """Save a `requests.Response` to a json file
@@ -170,13 +161,13 @@ class ObisHandler:
         output_dir = Path(f'{self.data_dir}/{self.whale}')
         output_dir.mkdir(parents=True, exist_ok=True)
 
+        # TODO is saving json files still necessary?
         with open(f'{output_dir}/{startdate}--{enddate}.json', 'w') as file:
             logger.info(f'Saving json response to {file.name}')
             json.dump(response.json(), file, ensure_ascii=False, indent=4)
 
-
     def batch_requests(self) -> None:
-        """Send requests in batches to OBIS api if total records exceeds the size limit"""
+        """Send requests in batches to OBIS api if total records exceed the size limit"""
         records, num_records = self.get_records()
 
         # make a single request if size is not exceeded

@@ -1,75 +1,59 @@
-import json
-import logging
-from logging import INFO
-import pandas as pd
-from pathlib import Path
-import pymysql.cursors
+import os
 import sys
-import typer
 from typing import Union
-from typing_extensions import Self
 
-logging.basicConfig(
-    format='[%(levelname)-5s][%(asctime)s][%(module)s:%(lineno)04d] : %(message)s', level=INFO, stream=sys.stderr
-)
-logger = logging.getLogger(__name__)
+from dotenv import load_dotenv
+import pandas as pd
+import sqlalchemy as db
+from sqlalchemy.dialects.mysql import insert
+from sqlalchemy.exc import OperationalError, NoSuchTableError
 
-ROOT_DIR = Path().cwd()
-with open(f"{ROOT_DIR}/config.json", 'r') as file:
-    config = json.load(file)
+from logging_setup import setup_logging
+from whales import whale_names
 
-# MySQL Configurations
-local_db = config['database']['local']
-host = local_db['host']
-user = local_db['user']
-password = local_db['password']
-db_name = local_db['db_name']
 
-# Whales Dictionary
-whales = config['whales']
+logger = setup_logging()
+
+load_dotenv()
+db_host = os.getenv('MYSQL_HOST')
+db_user = os.getenv('MYSQL_USER')
+db_pass = os.getenv('MYSQL_PASSWORD')
+db_name = os.getenv('MYSQL_DATABASE')
 
 
 class MySQLClient:
 
     def __init__(self) -> None:
-        logger.info('Creating MySQL connection..')
-        self.conn = pymysql.connect(
-            host=host,
-            user=user,
-            password=password,
-            database=db_name,
-            cursorclass=pymysql.cursors.DictCursor
-        )
-        self.cursor = self.conn.cursor()
+        self.create_engine()
+        self.load_tables()
 
-    def __enter__(self) -> Self:
-        return self
+    def create_engine(self) -> None:
+        try:
+            logger.info(f"Creating engine for database: {db_name} - host: {db_host}")
+            self.engine = db.create_engine(f"mysql+pymysql://{db_user}:{db_pass}@{db_host}/{db_name}")
+            with self.engine.connect() as conn:  # test database connection
+                pass
+        except OperationalError as e:
+            logger.error(f"Failed to create SQLAlchemy Engine (wrong credentials?): {e}")
+            sys.exit(1)
+        
+    def load_tables(self) -> None:
+        try:
+            metadata = db.MetaData()
+            self.species_table = db.Table('species', metadata, autoload_with=self.engine)
+            self.locations_table = db.Table('locations', metadata, autoload_with=self.engine)
+            self.occurrences_table = db.Table('occurrences', metadata, autoload_with=self.engine)
+            logger.info("Database tables loaded successfully.")
+        except NoSuchTableError as e:
+            logger.error(f"A table was not found: {e}")
+            sys.exit(1)
 
-    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-        self.conn.close()
-        logger.info('Connection closed.')
-
-    def close(self, commit=True) -> None:
-        if commit:
-            self.commit()
-        self.conn.close()
-        logger.info("Connection closed.")
-
-    def execute(self, sql, args: object=None) -> None:
-        self.cursor.execute(sql, args)
-
-    def query(self, query, args: object=None) -> Union[dict, None]:
-        self.cursor.execute(query, args)
-        print(self.cursor.fetchone())
-
-    def commit(self) -> None:
-        self.conn.commit()
-
-    def insert_occurrences(self, row, waterBodyId) -> None:
+    def insert_occurrences(self, conn, row, water_body_id) -> None:
         """
-        Insert pd.DataFrame row values into MySQL occurrences table
+        Insert DataFrame row values into occurrences table
 
         Args:
+            conn: sqlalchemy.engine.Connection
             row: pd.DataFrame
                 row to read
             waterBodyId: int
@@ -77,72 +61,86 @@ class MySQLClient:
         Returns:
             None
         """
-        sql = """INSERT INTO `occurrences` 
-                    (`id`, `eventDate`, `waterBodyId`, `latitude`, `longitude`, `speciesId`, `individualCount`,
-                    `start_year`, `start_month`, `start_day`, `end_year`, `end_month`, `end_day`, `date_is_valid`)
-                    VALUES 
-                    (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    ON DUPLICATE KEY
-                    UPDATE 
-                    eventDate=VALUES(eventDate), latitude=VALUES(latitude), longitude=VALUES(longitude), individualCount=VALUES(individualCount), 
-                    start_year=VALUES(start_year), start_month=VALUES(start_month), start_day=VALUES(start_day), end_year=VALUES(end_year), end_month=VALUES(end_month),
-                    end_day=VALUES(end_day), date_is_valid=VALUES(date_is_valid)"""
+        query = insert(self.occurrences_table).values(
+            id=row.occurrenceID, eventDate=row.eventDate, waterBodyId=water_body_id, latitude=row.decimalLatitude, 
+            longitude=row.decimalLongitude, speciesId=row.speciesid, individualCount=row.individualCount, 
+            start_year=row.start_year, start_month=row.start_month, start_day=row.start_day, 
+            end_year=row.end_year, end_month=row.end_month, end_day=row.end_day, date_is_valid=row.date_is_valid
+            )
         
-        self.execute(sql, (
-            row.occurrenceID, row.eventDate, waterBodyId, row.decimalLatitude, row.decimalLongitude, row.speciesid, row.individualCount, 
-            row.start_year, row.start_month, row.start_day, row.end_year, row.end_month, row.end_day, row.date_is_valid
-            ))
+        on_duplicate_query = query.on_duplicate_key_update(
+            eventDate=row.eventDate, latitude=row.decimalLatitude, longitude=row.decimalLongitude, 
+            individualCount=row.individualCount, start_year=row.start_year, start_month=row.start_month, 
+            start_day=row.start_day, end_year=row.end_year, end_month=row.end_month, end_day=row.end_day, 
+            date_is_valid=row.date_is_valid
+            )
+        
+        conn.execute(on_duplicate_query)
 
-    def insert_species(self, row) -> None:
+    def insert_species(self, conn, row) -> None:
         """
-        Insert pd.DataFrame row values into MySQL occurrences table
+        Insert DataFrame row values into occurrences table
 
         Args:
+            conn: sqlalchemy.engine.Connection
             row: pd.DataFrame
                 row to read
         Returns:
             None
         """
         # reverse whales dict to get vernacular name value
-        species_dict = {v['scientificname']: k.replace('_', ' ').title() for k, v in whales.items()}
+        species_dict = {v['scientificname']: k.replace('_', ' ').title() for k, v in whale_names.items()}
         vernacularName = species_dict[row.species]
-        sql = """INSERT INTO `species` 
-                        (`id`, `speciesName`, `vernacularName`)
-                        VALUES (%s, %s, %s)
-                        ON DUPLICATE KEY
-                        UPDATE speciesName=VALUES(speciesName), vernacularName=VALUES(vernacularName)"""
-        self.cursor.execute(sql, (row.speciesid, row.species, vernacularName))
 
-    def insert_or_update_location(self, row) -> Union[int, None]:
-        self.cursor.callproc('insert_or_update_location', (row.waterBody,))
-        result = self.cursor.fetchone()
-        waterBodyId = result['wb_id'] if result else None
-        return waterBodyId
+        query = insert(self.species_table).values(
+            id=row.speciesid, speciesName=row.species, vernacularName=vernacularName
+        )
 
-    def to_mysql(self, df: pd.DataFrame) -> None:
+        on_duplicate_query = query.on_duplicate_key_update(
+            id=row.speciesid, speciesName=row.species, vernacularName=vernacularName
+        )
+
+        conn.execute(on_duplicate_query)
+
+    def insert_or_update_location(self, conn, row) -> Union[int, None]:
         """
-        Insert pd.DataFrame rows into MySQL tables
+        Call stored procedure on locations table which either inserts or updates a row 
+        """
+        exe = conn.execute(db.text('CALL insert_or_update_location(:wb_name)'), {'wb_name': row.waterBody})
+        result = exe.fetchone()
+        water_body_id = result[0] if result else None
+        return water_body_id
+
+    def to_mysql(self, data: Union[pd.DataFrame, str]) -> None:
+        """
+        Insert DataFrame rows into database tables. Only 1 of the 2 parameters
+        can be used.
 
         Args:
-            df: pd.DataFrame
-                data to send to MySQL database
+            data: pd.DataFrame or str
+                dataframe or csv filename to read from
         Returns:
             None
         """
+        df = None
+        if isinstance(data, str):
+            try:
+                df = pd.read_csv(data)
+            except FileNotFoundError as e:
+                logger.error(f'Failed to read csv filepath - {e}')
+                sys.exit(1)
+        elif isinstance(data, pd.DataFrame):
+            df = data
+
         df['waterBody'] = df['waterBody'].apply(lambda x: None if pd.isna(x) else x)
 
         try:
-            logger.info('Inserting rows.')
-                                
-            for row in df.itertuples(index=False):
-                waterBodyId = self.insert_or_update_location(row)
-                self.insert_species(row)
-                self.insert_occurrences(row, waterBodyId)
-
-                self.conn.commit()
-
-            logger.info('Inserts completed.')
-        except pymysql.Error as e:
-            logger.info(e)
-            self.conn.rollback()
-
+            logger.info('Opening database connection and inserting rows..')
+            with self.engine.begin() as conn:          
+                for row in df.itertuples(index=False):
+                    water_body_id = self.insert_or_update_location(conn, row)
+                    self.insert_species(conn, row)
+                    self.insert_occurrences(conn, row, water_body_id)
+            logger.info('Inserts completed, connection closed.')
+        except OperationalError as e:
+            logger.error(f'Error during SQL inserts: {e}')
