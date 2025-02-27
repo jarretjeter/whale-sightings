@@ -1,3 +1,4 @@
+# from dataclasses import _DataclassT
 import json
 from pathlib import Path
 import re
@@ -52,7 +53,7 @@ class ObisHandler:
     """
     data_dir = './data'
 
-    def __init__(self, api: ApiClient, whale: str, startdate: str='', enddate: str='', size: int=10000) -> None:
+    def __init__(self, api: ApiClient, context) -> None:
         """
         Args:
             api: ApiClient
@@ -67,13 +68,13 @@ class ObisHandler:
                 The API does not accept a size limit greater than 10,000
         """
         self.api = api
-        if whale in whale_names:
-            self.whale = whale
+        if context.whale and context.whale in whale_names:
+            self.whale = context.whale
         else:
-            raise ValueError(f'{whale} not in whale_names dictionary. {whale_names.keys()}')
-        self.startdate = startdate
-        self.enddate = enddate
-        self.size = size
+            raise ValueError(f'{context.whale} not in whale_names dictionary. {whale_names.keys()}')
+        self.startdate = context.startdate
+        self.enddate = context.enddate
+        self.size = context.size
 
     def get_records(self) -> Tuple[List[Dict], int]:
         """Retrieve total number of records from a request to the /statistics/years endpoint
