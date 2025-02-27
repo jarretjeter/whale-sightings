@@ -70,19 +70,19 @@ class Validator:
     """
     data_dir = './data'
 
-    def __init__(self, whale: str, startdate: Optional[str]=None, enddate: Optional[str]=None) -> None:
+    def __init__(self, context) -> None:
         """
         whale: str
             Name of file directory to search
         startdate, enddate: str
             Date range of files to match
         """
-        if whale in whale_names:
-            self.whale = whale
+        if context.whale and context.whale in whale_names:
+            self.whale = context.whale
         else:
-            raise ValueError(f'{whale} not in whales dictionary. {whale_names.keys()}')
-        self.startdate = startdate
-        self.enddate = enddate
+            raise ValueError(f'{context.whale} not in whale_names dictionary. {whale_names.keys()}')
+        self.startdate = context.startdate
+        self.enddate = context.enddate
 
     def match_files(self) -> list:
         """

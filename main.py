@@ -1,3 +1,5 @@
+from dataclasses import dataclass
+
 import typer
 
 from db import MySQLClient
@@ -8,18 +10,29 @@ pipeline = typer.Typer()
 #TODO add context data for pipeline
 
 
-@pipeline.command('main')
+@dataclass
+class pipeline_context:
+    #TODO if whale in whales
+    whale: str
+    startdate: str = ''
+    enddate: str = ''
+    size: int = 10000
+
+
+@pipeline.command('pipeline')
 def main(whale: str, startdate: str='', enddate: str='') -> None:
     """
     Full pipeline orchestration
     """
+    context = pipeline_context(whale, startdate, enddate)
+
     api = obis.ApiClient()
-    handler = obis.ObisHandler(api, whale, startdate, enddate)
+    handler = obis.ObisHandler(api, context)
     handler.batch_requests()
 
-    validator = validate.Validator(whale, startdate, enddate)
+    validator = validate.Validator(context)
     valid_data, error_data = validator.validate_response()
-    data_cleaner = cleaner.WhaleDataCleaner(whale, valid_data, error_data, startdate, enddate)
+    data_cleaner = cleaner.WhaleDataCleaner(valid_data, error_data, context)
     df = data_cleaner.process_and_save()
 
     mysql_client = MySQLClient()
@@ -28,12 +41,14 @@ def main(whale: str, startdate: str='', enddate: str='') -> None:
 # Checkpoints
 
 @pipeline.command('obis')
-def fetch_api(whale: str, startdate: str='', enddate: str='') -> None:
+def fetch_api(whale: str, startdate: str='', enddate: str='', size: int=10000) -> None:
     """
     Only retrieve data from the Obis API
     """
+    context = pipeline_context(whale, startdate, enddate, size)
+
     api = obis.ApiClient()
-    handler = obis.ObisHandler(api, whale, startdate, enddate)
+    handler = obis.ObisHandler(api, context)
     handler.batch_requests()
 
 @pipeline.command('process')
@@ -41,9 +56,11 @@ def validate_and_process(whale: str, startdate: str='', enddate: str='') -> None
     """
     Data validations and transformations
     """
-    validator = validate.Validator(whale, startdate, enddate)
+    context = pipeline_context(whale, startdate, enddate)
+
+    validator = validate.Validator(context)
     valid_data, error_data = validator.validate_response()
-    data_cleaner = cleaner.WhaleDataCleaner(whale, valid_data, error_data, startdate, enddate)
+    data_cleaner = cleaner.WhaleDataCleaner(valid_data, error_data, context)
     data_cleaner.process_and_save()
 
 @pipeline.command('db')

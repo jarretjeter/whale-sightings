@@ -34,7 +34,7 @@ class WhaleDataCleaner:
     """
     data_dir = './data'
 
-    def __init__(self, whale: str, valid_data: dict, error_data: dict, startdate: Optional[str]=None, enddate: Optional[str]=None) -> None:
+    def __init__(self, valid_data: dict, error_data: dict, context) -> None:
         """
         Args:
             whale: str
@@ -42,15 +42,15 @@ class WhaleDataCleaner:
             valid_data, error_data: dict
                 Data to process. If errors pass checks, they'll be processed with valid data
             startdate, enddate: str
-                Used for csv writing.
+                YYYY-MM-DD format. Used for csv writing.
                 If no arguments are supplied, a function call will get values
         """
-        if whale in whale_names:
-            self.whale = whale
+        if context.whale and context.whale in whale_names:
+            self.whale = context.whale
         else:
-            raise ValueError(f'{whale} not in whales dictionary. {whale_names.keys()}')
-        self.start = startdate
-        self.end = enddate
+            raise ValueError(f'{context.whale} not in whale_names dictionary. {whale_names.keys()}')
+        self.startdate = context.startdate
+        self.enddate = context.enddate
         self.valid_data = valid_data
         self.error_data = error_data
 
@@ -179,15 +179,15 @@ class WhaleDataCleaner:
         """
         valid_dates = df[df['date_is_valid'] == True]
 
-        if not self.start and not self.end:
-            self.start = min(valid_dates['eventDate'])
-            self.end = max(valid_dates['eventDate'])
+        if not self.startdate and not self.enddate:
+            self.startdate = min(valid_dates['eventDate'])
+            self.enddate = max(valid_dates['eventDate'])
 
-        elif self.start and not self.end:
-            self.end = max(valid_dates['eventDate'])
+        elif self.startdate and not self.enddate:
+            self.enddate = max(valid_dates['eventDate'])
         
-        elif self.end and not self.start:
-            self.start = min(valid_dates['eventDate'])
+        elif self.enddate and not self.startdate:
+            self.startdate = min(valid_dates['eventDate'])
 
         else:
             pass
@@ -393,7 +393,7 @@ class WhaleDataCleaner:
         merged_df = self.merge_data()
         self.get_start_and_end(merged_df)
         # TODO do I still need to save csv files?
-        self.filename = f"{output_dir}/{self.start}--{self.end}.csv"
+        self.filename = f"{output_dir}/{self.startdate}--{self.enddate}.csv"
         logger.info(f'Saving dataframe to {self.filename}')
         merged_df.to_csv(f"{self.filename}", index=False)
         return merged_df
