@@ -9,7 +9,6 @@ from typing import Optional, Tuple
 from pydantic import BaseModel, ConfigDict, Field, field_validator, ValidationError
 
 from logging_setup import setup_logging
-from whales import whale_names
 
 
 logger = setup_logging()
@@ -65,24 +64,23 @@ class Results(BaseModel):
 
 
 class Validator:
-    """
-    Class for retrieving files and running Pydantic model validations
-    """
-    data_dir = './data'
+    """Class for retrieving files and running Pydantic model validations"""
 
     def __init__(self, context) -> None:
         """
-        whale: str
-            Name of file directory to search
-        startdate, enddate: str
-            Date range of files to match
+        Parameters
+        ----------
+        context : PipelineContext
+            A context object containing pipeline parameters
+            - whale: str ->
+                Name of file directory to search
+            - startdate, enddate: str ->
+                Date range of files to match
         """
-        if context.whale and context.whale in whale_names:
-            self.whale = context.whale
-        else:
-            raise ValueError(f'{context.whale} not in whale_names dictionary. {whale_names.keys()}')
+        self.whale = context.whale
         self.startdate = context.startdate
         self.enddate = context.enddate
+        self.data_dir = context.data_dir
 
     def match_files(self) -> list:
         """
