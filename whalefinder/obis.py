@@ -10,7 +10,6 @@ import requests
 from requests.adapters import HTTPAdapter, Retry
 
 from logging_setup import setup_logging
-from whales import whale_names
 
 
 logger = setup_logging()
@@ -32,12 +31,13 @@ class ApiClient:
         """
         Send a get request to the api
         
-        Args:
-            endpoint: str
+        Parameters
+        ----------
+            endpoint : str
                 API endpoint to request
-            params: dict
+            params : dict
                 parameters to send with request
-        Returns:
+        Returns :
             requests.Response
         """
         try:
@@ -49,32 +49,32 @@ class ApiClient:
         
 
 class ObisHandler:
-    """Object for handling whale data from specific OBIS api endpoints
-    """
-    data_dir = './data'
+    """Object for handling whale data from specific OBIS api endpoints"""
 
     def __init__(self, api: ApiClient, context) -> None:
         """
-        Args:
-            api: ApiClient
-                Object to make calls to the OBIS API
-            whale: str
+        Parameters
+        ----------
+        api : ApiClient
+            Object to make calls to the OBIS API
+        context : PipelineContext
+            A context object containing pipeline parameters
+            - whale : str ->
                 Whale for the api to query
-            startdate, enddate: str
+            - startdate, enddate : str ->
                 start and end dates to query through, in `YYYY-MM-DD` format.
                 If values are empty, the earliest/latest records are retrieved.
-            size: int, default 10,000
+            - size : int -> default 10,000
                 Maximum number of allowed results returned in json response
                 The API does not accept a size limit greater than 10,000
         """
         self.api = api
-        if context.whale and context.whale in whale_names:
-            self.whale = context.whale
-        else:
-            raise ValueError(f'{context.whale} not in whale_names dictionary. {whale_names.keys()}')
+        self.whale = context.whale
         self.startdate = context.startdate
         self.enddate = context.enddate
         self.size = context.size
+        self.data_dir = context.data_dir
+        self.scientificname = context.get_scientific_name()
 
     def get_records(self) -> Tuple[List[Dict], int]:
         """Retrieve total number of records from a request to the /statistics/years endpoint
@@ -83,8 +83,7 @@ class ObisHandler:
             tuple[list[dict], int]
         """
         endpoint = '/statistics/years'
-        scientificname = whale_names[self.whale]['scientificname']
-        params = {'scientificname': scientificname, 'startdate': self.startdate, 'enddate': self.enddate}
+        params = {'scientificname': self.scientificname, 'startdate': self.startdate, 'enddate': self.enddate}
 
         logger.info(f"Getting records for {self.whale}")
         records = self.api.send_request(endpoint, params)
@@ -133,9 +132,8 @@ class ObisHandler:
             None
         """
         endpoint = '/occurrence'
-        scientificname = whale_names[self.whale]['scientificname']
         startdate, enddate = self.make_dateformat((startdate, enddate))
-        params = {'scientificname': scientificname, 'startdate': startdate, 'enddate': enddate, 'size': self.size}
+        params = {'scientificname': self.scientificname, 'startdate': startdate, 'enddate': enddate, 'size': self.size}
         
         logger.info(f"Sending /occurrence request for date period: {startdate}-{enddate}")
         response = self.api.send_request(endpoint, params)
@@ -162,7 +160,6 @@ class ObisHandler:
         output_dir = Path(f'{self.data_dir}/{self.whale}')
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # TODO is saving json files still necessary?
         with open(f'{output_dir}/{startdate}--{enddate}.json', 'w') as file:
             logger.info(f'Saving json response to {file.name}')
             json.dump(response.json(), file, ensure_ascii=False, indent=4)

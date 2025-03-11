@@ -10,7 +10,6 @@ import geopandas as gpd
 import pandas as pd
 
 from logging_setup import setup_logging
-from whales import whale_names
 
 
 logger = setup_logging()
@@ -32,27 +31,27 @@ class WhaleDataCleaner:
     """Pandas and GeoPandas functionalities for handling whale data 
     obtained from OBIS (https://obis.org/).
     """
-    data_dir = './data'
 
     def __init__(self, valid_data: dict, error_data: dict, context) -> None:
         """
-        Args:
-            whale: str
+        Parameters
+        ---------
+        valid_data, error_data : dict 
+            Data to process. If errors pass checks, they'll be processed with valid data
+        context : PipelineContext
+            A context object containing pipeline parameters
+            - whale : str ->
                 Name for file paths and column values
-            valid_data, error_data: dict
-                Data to process. If errors pass checks, they'll be processed with valid data
-            startdate, enddate: str
+            - startdate, enddate : str ->
                 YYYY-MM-DD format. Used for csv writing.
                 If no arguments are supplied, a function call will get values
         """
-        if context.whale and context.whale in whale_names:
-            self.whale = context.whale
-        else:
-            raise ValueError(f'{context.whale} not in whale_names dictionary. {whale_names.keys()}')
+        self.whale = context.whale
         self.startdate = context.startdate
         self.enddate = context.enddate
         self.valid_data = valid_data
         self.error_data = error_data
+        self.data_dir = context.data_dir
 
     def fill_in(self, df: pd.DataFrame) -> pd.DataFrame:
         """
