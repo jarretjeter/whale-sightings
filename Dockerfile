@@ -1,4 +1,6 @@
-FROM python:3.8-slim
+# TODO update python version?
+FROM python:3.13-slim
+# RUN python -m pip install --upgrade pip
 
 WORKDIR /app
 
