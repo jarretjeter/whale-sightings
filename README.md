@@ -93,7 +93,29 @@ mysql> SELECT * FROM locations;
 9 rows in set (0.01 sec)
 ```
 
-#### Step 5 Stop services and remove containers once finished:
+#### Step 5 Build, start up, and access Jupyter notebook service:
+```
+$ docker compose build jupyter
+```
+
+```
+$ docker compose up -d jupyter
+```
+
+```
+$ docker compose logs jupyter
+....
+whale-sightings-jupyter  |     To access the server, open this file in a browser:
+whale-sightings-jupyter  |         file:///home/jovyan/.local/share/jupyter/runtime/jpserver-1-open.html
+whale-sightings-jupyter  |     Or copy and paste one of these URLs:
+whale-sightings-jupyter  |         http://b47abf761558:8888/lab?token=e36ebbc840e0ee39d9e2148b1d5d7e52a9f481d36c1314ea
+whale-sightings-jupyter  |         http://127.0.0.1:8888/lab?token=e36ebbc840e0ee39d9e2148b1d5d7e52a9f481d36c1314ea
+```
+
+#### Step 6 Run notebook cells to view data visualizations for sighting records:
+![alt text](<./notebooks/visualization.png>)
+
+#### Step 7 Stop services and remove containers once finished:
 ```
 docker compose down
 ```

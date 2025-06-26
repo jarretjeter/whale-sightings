@@ -1,4 +1,3 @@
-# from dataclasses import _DataclassT
 import json
 from pathlib import Path
 import re
@@ -85,7 +84,7 @@ class ObisHandler:
         endpoint = '/statistics/years'
         params = {'scientificname': self.scientificname, 'startdate': self.startdate, 'enddate': self.enddate}
 
-        logger.info(f"Getting records for {self.whale}")
+        logger.info(f"Getting records for species: {self.whale}")
         records = self.api.send_request(endpoint, params)
         records = records.json()
 
